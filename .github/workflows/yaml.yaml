@@ -1,0 +1,33 @@
+---
+name: 'yaml'
+
+'on':
+  pull_request:
+    branches:
+      - 'main'
+    paths:
+      - '**.yaml'
+      - '**.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: 'read'
+
+jobs:
+  yamllint:
+    name: 'yaml lint'
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'checkout repository'
+        uses: 'actions/checkout@v6'
+        with:
+          persist-credentials: false
+      - name: 'setup just and uv'
+        uses: './.github/actions/setup-just-and-uv'
+        with:
+          python-version: '3.12'
+      - name: 'run yamllint'
+        run: 'just yamllint'
+        env:
+          UV_LOCKED: 'true'
+          UV_PYTHON_VERSION: '3.12'

@@ -1,0 +1,109 @@
+---
+name: 'ci'
+
+'on':
+  pull_request:
+    branches:
+      - 'main'
+  workflow_dispatch:
+
+permissions:
+  contents: 'read'
+
+jobs:
+  quality:
+    name: 'quality'
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'checkout repository'
+        uses: 'actions/checkout@v6'
+        with:
+          persist-credentials: false
+      - name: 'setup just and uv'
+        uses: './.github/actions/setup-just-and-uv'
+        with:
+          python-version: '3.12'
+      - name: 'run quality checks'
+        run: 'just quality'
+        env:
+          UV_LOCKED: 'true'
+          UV_PYTHON_VERSION: '3.12'
+  package:
+    name: 'package'
+    runs-on: 'ubuntu-latest'
+    steps:
+      - name: 'checkout repository'
+        uses: 'actions/checkout@v6'
+        with:
+          persist-credentials: false
+      - name: 'setup just and uv'
+        uses: './.github/actions/setup-just-and-uv'
+        with:
+          python-version: '3.12'
+      - name: 'sync dev environment'
+        run: 'uv sync --locked --python 3.12 --group dev'
+      - name: 'check package artifacts'
+        run: 'just build-check'
+        env:
+          UV_LOCKED: 'true'
+          UV_PYTHON_VERSION: '3.12'
+  tests:
+    name: 'tests (${{ matrix.python-version }}, ${{ matrix.coverage }})'
+    needs:
+      - 'package'
+      - 'quality'
+    runs-on: 'ubuntu-latest'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python-version: '3.11'
+            coverage: false
+          - python-version: '3.12'
+            coverage: true
+          - python-version: '3.13'
+            coverage: false
+          - python-version: '3.14'
+            coverage: false
+    steps:
+      - name: 'checkout repository'
+        uses: 'actions/checkout@v6'
+        with:
+          persist-credentials: false
+      - name: 'setup just and uv with python ${{ matrix.python-version }}'
+        uses: './.github/actions/setup-just-and-uv'
+        with:
+          python-version: '${{ matrix.python-version }}'
+      - name: 'run coverage tests'
+        if: '${{ matrix.coverage }}'
+        run: 'just cov'
+        env:
+          UV_LOCKED: 'true'
+          UV_PYTHON_VERSION: '${{ matrix.python-version }}'
+      - name: 'run full pytest suite'
+        if: '${{ !matrix.coverage }}'
+        run: 'just ci-pytest'
+        env:
+          UV_LOCKED: 'true'
+          UV_PYTHON_VERSION: '${{ matrix.python-version }}'
+  flepimop2-dev:
+    name: 'flepimop2-dev'
+    needs:
+      - 'tests'
+    runs-on: 'ubuntu-latest'
+    # Non-blocking heads-up signal: surface upcoming breakage against the
+    # development (main branch) version of flepimop2 without failing the PR.
+    continue-on-error: true
+    steps:
+      - name: 'checkout repository'
+        uses: 'actions/checkout@v6'
+        with:
+          persist-credentials: false
+      - name: 'setup just and uv'
+        uses: './.github/actions/setup-just-and-uv'
+        with:
+          python-version: '3.12'
+      - name: 'run tests against flepimop2 main'
+        run: 'just flepimop2-dev'
+        env:
+          UV_PYTHON_VERSION: '3.12'
