@@ -22,14 +22,13 @@ from pathlib import Path
 from typing import Literal
 
 import nbformat
-from flepimop2.abcs import ProcessABC
-from flepimop2.configuration import ModuleModel
 from flepimop2.exceptions import ValidationIssue
+from flepimop2.process.abc import ProcessABC
 from flepimop2.process.ipynbrender._utils import _which_jupyter  # noqa: PLC2701
 from pydantic import Field, PrivateAttr
 
 
-class IpynbRenderProcess(ModuleModel, ProcessABC):
+class IpynbRenderProcess(ProcessABC, module="ipynbrender"):
     """
     Process to render Jupyter notebooks.
 
@@ -45,7 +44,6 @@ class IpynbRenderProcess(ModuleModel, ProcessABC):
 
     """
 
-    module: Literal["flepimop2.process.ipynbrender"] = "flepimop2.process.ipynbrender"
     file: Path
     output: Path
     format: Literal[
