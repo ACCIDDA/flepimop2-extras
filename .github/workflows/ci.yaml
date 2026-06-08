@@ -49,9 +49,6 @@ jobs:
           UV_PYTHON_VERSION: '3.12'
   tests:
     name: 'tests (${{ matrix.python-version }}, ${{ matrix.coverage }})'
-    needs:
-      - 'package'
-      - 'quality'
     runs-on: 'ubuntu-latest'
     strategy:
       fail-fast: false
@@ -88,11 +85,7 @@ jobs:
           UV_PYTHON_VERSION: '${{ matrix.python-version }}'
   flepimop2-dev:
     name: 'flepimop2-dev'
-    needs:
-      - 'tests'
     runs-on: 'ubuntu-latest'
-    # Non-blocking heads-up signal: surface upcoming breakage against the
-    # development (main branch) version of flepimop2 without failing the PR.
     continue-on-error: true
     steps:
       - name: 'checkout repository'
