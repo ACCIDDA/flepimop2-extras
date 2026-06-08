@@ -1,3 +1,18 @@
+# flepimop2-slurm: A Slurm job provider for flepimop2
+# Copyright (C) 2026  Carl Pearson, Joshua Macdonald, Timothy Willard
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """Integration tests for 'ipynbrender' module via the `flepimop2 process` CLI."""
 
 import shutil
@@ -18,7 +33,7 @@ def test_run_nb_from_config(tmp_path: Path, output: str) -> None:
         f"""
 ---
 process:
-  run-nb:
+  run_nb:
     module: 'ipynbrender'
     file: 'test.ipynb'
     output: '{output}'
@@ -32,7 +47,7 @@ process:
     assert not output_path.exists()
     # Run flepimop2 process command with dry run
     first_result = subprocess.run(  # noqa: S603
-        [flepimop2, "process", "--dry-run", "--target", "run-nb", "config.yaml"],
+        [flepimop2, "process", "--dry-run", "--target", "run_nb", "config.yaml"],
         check=False,
         cwd=tmp_path,
         capture_output=True,
@@ -43,7 +58,7 @@ process:
     assert not output_path.exists()
     # Run flepimop2 process command
     second_result = subprocess.run(  # noqa: S603
-        [flepimop2, "process", "--target", "run-nb", "config.yaml"],
+        [flepimop2, "process", "--target", "run_nb", "config.yaml"],
         check=False,
         cwd=tmp_path,
         capture_output=True,
