@@ -645,7 +645,7 @@ wheels = [
 
 [[package]]
 name = "flepimop2"
-version = "0.2.0"
+version = "0.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
@@ -654,9 +654,9 @@ dependencies = [
     { name = "pyyaml" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/da/bc/8d71877bd71869d7bc42cb1c0b8ee96944e16dbc815cce34580c53515586/flepimop2-0.2.0.tar.gz", hash = "sha256:e435a1477aca6907d75ec4bd9646f24730f8030cc684d725b04685c6dc61a6a9", size = 67910, upload-time = "2026-04-28T16:39:57.932Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/4f/34/8655d5ff42e5c6c4f149f9754da7893db452b158e400ad39f6452599ff20/flepimop2-0.3.0.tar.gz", hash = "sha256:b92d14e4e740db23abbce555cebf69906cfd9cfe932c6edcb36bd9425d69ebf5", size = 101133, upload-time = "2026-06-11T20:36:59.952Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/44/3a/f59203a0383b4f7288e00ae6baa03b416ff86466c6a7cfcd59a8236542e1/flepimop2-0.2.0-py3-none-any.whl", hash = "sha256:4aa2303a2904bab70c3681839603c6682c73e71417a873eea8fea0a7f98d9b50", size = 97151, upload-time = "2026-04-28T16:39:56.468Z" },
+    { url = "https://files.pythonhosted.org/packages/33/97/4deb4aaa7faa82c4b243414195598f0ffaa01707d89e2b396789c3be5552/flepimop2-0.3.0-py3-none-any.whl", hash = "sha256:542396003e534ea87c1704f61102cf4ccd3bf82de404f008e69ae193b59e6b99", size = 142464, upload-time = "2026-06-11T20:36:58.618Z" },
 ]
 
 [[package]]
@@ -724,7 +724,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "flepimop2", specifier = ">=0.2.0,<1.0.0" },
+    { name = "flepimop2", specifier = ">=0.3.0,<1.0.0" },
     { name = "jupyter", specifier = ">=1.1.1" },
     { name = "nbformat", specifier = ">=5.10.4" },
     { name = "pydantic", specifier = ">=2.12.4" },
@@ -739,7 +739,7 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "flepimop2", specifier = ">=0.2.0,<1.0.0" }]
+requires-dist = [{ name = "flepimop2", specifier = ">=0.3.0,<1.0.0" }]
 
 [[package]]
 name = "fqdn"
@@ -813,7 +813,7 @@ name = "importlib-metadata"
 version = "9.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "zipp" },
+    { name = "zipp", marker = "python_full_version < '3.14'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/a9/01/15bb152d77b21318514a96f43af312635eb2500c96b55398d020c93d86ea/importlib_metadata-9.0.0.tar.gz", hash = "sha256:a4f57ab599e6a2e3016d7595cfd72eb4661a5106e787a95bcc90c7105b831efc", size = 56405, upload-time = "2026-03-20T06:42:56.999Z" }
 wheels = [

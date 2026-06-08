@@ -49,7 +49,7 @@ build-backend = "hatchling.build"
 # `just check-versions` fails CI if any package has drifted.
 [tool.flepimop2-extras]
 version = "0.3.0dev"
-flepimop2-constraint = "flepimop2>=0.2.0,<1.0.0"
+flepimop2-constraint = "flepimop2>=0.3.0,<1.0.0"
 
 # The metapackage has no modules of its own, so build a code-less wheel.
 [tool.hatch.build.targets.wheel]

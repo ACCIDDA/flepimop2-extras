@@ -53,7 +53,6 @@ clean:
     find . -type d -name __pycache__ -prune -exec rm -rf {} +
     rm -rf .venv
     rm -rf dist
-    rm -f uv.lock
 
 # Run CI `ruff` formatting/linting checks
 [group('ci')]
