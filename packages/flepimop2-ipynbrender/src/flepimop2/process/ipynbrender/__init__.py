@@ -19,12 +19,15 @@ __all__ = ["IpynbRenderProcess"]
 
 import subprocess  # noqa: S404
 from pathlib import Path
-from typing import Literal
+from shutil import which
 
 import nbformat
 from flepimop2.exceptions import ValidationIssue
 from flepimop2.process.abc import ProcessABC
-from flepimop2.process.ipynbrender._utils import _which_jupyter  # noqa: PLC2701
+from flepimop2.process.ipynbrender._utils import (  # noqa: PLC2701
+    NbConvertFormat,
+    _extension_to_format,
+)
 from pydantic import Field, PrivateAttr
 
 
@@ -46,20 +49,12 @@ class IpynbRenderProcess(ProcessABC, module="ipynbrender"):
 
     file: Path
     output: Path
-    format: Literal[
-        "html",
-        "latex",
-        "pdf",
-        "webpdf",
-        "slides",
-        "markdown",
-        "asciidoc",
-        "rst",
-        "notebook",
-    ] = Field(default_factory=lambda data: data["output"].suffix.lstrip("."))
-    version: int = Field(default=4, gt=0, le=4)
+    format: NbConvertFormat = Field(
+        default_factory=lambda data: _extension_to_format(data["output"].suffix)
+    )
+    version: int | None = Field(default=None, gt=0)
 
-    _jupyter: str = PrivateAttr(default_factory=_which_jupyter)
+    _jupyter: str | None = PrivateAttr(default_factory=lambda: which("jupyter"))
 
     def _process_validate(self) -> list[ValidationIssue] | None:
         """
@@ -70,18 +65,29 @@ class IpynbRenderProcess(ProcessABC, module="ipynbrender"):
             in valid notebook format, otherwise `None`.
 
         """
+        validation_issues: list[ValidationIssue] = []
+        if self._jupyter is None:
+            validation_issues.append(
+                ValidationIssue(
+                    msg="`jupyter` executable not found in PATH", kind="file_not_found"
+                )
+            )
         with self.file.open("r", encoding="utf-8") as f:
-            notebook_content = nbformat.read(f, as_version=self.version)  # type: ignore[no-untyped-call]
+            notebook_content = nbformat.read(
+                f, as_version=self.version or nbformat.NO_CONVERT
+            )  # type: ignore[no-untyped-call]
         try:
             nbformat.validate(notebook_content)
         except nbformat.ValidationError as e:
-            return [
+            validation_issues.append(
                 ValidationIssue(
                     msg=str(e),
                     kind="invalid_notebook",
                     ctx={"location": str(self.file)},
                 )
-            ]
+            )
+        if validation_issues:
+            return validation_issues
         return None
 
     def _process(self, *, dry_run: bool) -> None:
@@ -91,7 +97,14 @@ class IpynbRenderProcess(ProcessABC, module="ipynbrender"):
         Args:
             dry_run: If `True`, the command that would have been executed to run the
                 notebook will be printed but not executed.
+
+        Raises:
+            FileNotFoundError: If the `jupyter` executable is not found in the PATH.
+
         """
+        if self._jupyter is None:
+            msg = "`jupyter` executable not found in PATH"
+            raise FileNotFoundError(msg)
         cmd = [
             self._jupyter,
             "nbconvert",
