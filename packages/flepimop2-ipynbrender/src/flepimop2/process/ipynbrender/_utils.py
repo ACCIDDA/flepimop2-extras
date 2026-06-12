@@ -13,21 +13,58 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-from shutil import which
+from typing import Literal
+
+NbConvertFormat = Literal[
+    "html",
+    "latex",
+    "pdf",
+    "webpdf",
+    "slides",
+    "markdown",
+    "asciidoc",
+    "rst",
+    "notebook",
+]
 
 
-def _which_jupyter() -> str:
+def _extension_to_format(
+    extension: str,
+) -> NbConvertFormat:
     """
-    Find the 'jupyter' executable in the system PATH.
+    Convert a file extension to the corresponding notebook format.
+
+    Args:
+        extension: The file extension (e.g., ".html", ".pdf").
 
     Returns:
-        The absolute path to the 'jupyter' executable as a string.
+        The corresponding notebook format (e.g., "html", "pdf").
 
-    Raises:
-        FileNotFoundError: If 'jupyter' is not found in the system PATH.
+    Examples:
+        >>> _extension_to_format(".html")
+        'html'
+        >>> _extension_to_format(".pdf")
+        'pdf'
+        >>> _extension_to_format(".ipynb")
+        'notebook'
+        >>> _extension_to_format(".md")
+        'markdown'
     """
-    jupyter = which("jupyter")
-    if jupyter is None:
-        msg = "jupyter executable not found in PATH"
-        raise FileNotFoundError(msg)
-    return jupyter
+    extension_to_format: dict[str, NbConvertFormat] = {
+        ".html": "html",
+        ".htm": "html",
+        ".latex": "latex",
+        ".tex": "latex",
+        ".pdf": "pdf",
+        ".webpdf": "webpdf",
+        ".slides": "slides",
+        ".markdown": "markdown",
+        ".md": "markdown",
+        ".asciidoc": "asciidoc",
+        ".adoc": "asciidoc",
+        ".txt": "asciidoc",
+        ".rst": "rst",
+        ".notebook": "notebook",
+        ".ipynb": "notebook",
+    }
+    return extension_to_format.get(extension, "notebook")
