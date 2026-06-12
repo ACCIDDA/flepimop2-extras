@@ -15,15 +15,15 @@ job:
 Like other packages in the `flepimop2-extras` package it can either be installed directly via:
 
 ```bash
-pip install flepimop2-slurm
+pip install "flepimop2-slurm@git+https://github.com/ACCIDDA/flepimop2-extras.git@main#subdirectory=packages/flepimop2-slurm"
 ```
 
 or as a part of a dependency group in `flepimop2-extras` if you're using multiple modules from this package:
 
 ```bash
-pip install flepimop2-extras[slurm]
+pip install "flepimop2-extras[slurm]@git+https://github.com/ACCIDDA/flepimop2-extras.git@main"
 # or
-pip install flepimop2-extras[all]
+pip install "flepimop2-extras[all]@git+https://github.com/ACCIDDA/flepimop2-extras.git@main"
 ```
 
 ## Configuration
