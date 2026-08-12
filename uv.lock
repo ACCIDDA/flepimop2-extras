@@ -9,8 +9,10 @@ resolution-markers = [
 [manifest]
 members = [
     "flepimop2-extras",
+    "flepimop2-fetch",
     "flepimop2-ipynbrender",
     "flepimop2-slurm",
+    "flepimop2-transform",
 ]
 
 [[package]]
@@ -666,8 +668,13 @@ source = { editable = "." }
 
 [package.optional-dependencies]
 all = [
+    { name = "flepimop2-fetch" },
     { name = "flepimop2-ipynbrender" },
     { name = "flepimop2-slurm" },
+    { name = "flepimop2-transform" },
+]
+fetch = [
+    { name = "flepimop2-fetch" },
 ]
 ipynbrender = [
     { name = "flepimop2-ipynbrender" },
@@ -675,12 +682,17 @@ ipynbrender = [
 slurm = [
     { name = "flepimop2-slurm" },
 ]
+transform = [
+    { name = "flepimop2-transform" },
+]
 
 [package.dev-dependencies]
 dev = [
     { name = "build" },
+    { name = "flepimop2-fetch" },
     { name = "flepimop2-ipynbrender" },
     { name = "flepimop2-slurm" },
+    { name = "flepimop2-transform" },
     { name = "mypy" },
     { name = "pytest" },
     { name = "pytest-cov" },
@@ -691,24 +703,45 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "flepimop2-fetch", marker = "extra == 'all'", editable = "packages/flepimop2-fetch" },
+    { name = "flepimop2-fetch", marker = "extra == 'fetch'", editable = "packages/flepimop2-fetch" },
     { name = "flepimop2-ipynbrender", marker = "extra == 'all'", editable = "packages/flepimop2-ipynbrender" },
     { name = "flepimop2-ipynbrender", marker = "extra == 'ipynbrender'", editable = "packages/flepimop2-ipynbrender" },
     { name = "flepimop2-slurm", marker = "extra == 'all'", editable = "packages/flepimop2-slurm" },
     { name = "flepimop2-slurm", marker = "extra == 'slurm'", editable = "packages/flepimop2-slurm" },
+    { name = "flepimop2-transform", marker = "extra == 'all'", editable = "packages/flepimop2-transform" },
+    { name = "flepimop2-transform", marker = "extra == 'transform'", editable = "packages/flepimop2-transform" },
 ]
-provides-extras = ["ipynbrender", "slurm", "all"]
+provides-extras = ["ipynbrender", "fetch", "slurm", "transform", "all"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "build", specifier = ">=1.4.2" },
+    { name = "flepimop2-fetch", editable = "packages/flepimop2-fetch" },
     { name = "flepimop2-ipynbrender", editable = "packages/flepimop2-ipynbrender" },
     { name = "flepimop2-slurm", editable = "packages/flepimop2-slurm" },
+    { name = "flepimop2-transform", editable = "packages/flepimop2-transform" },
     { name = "mypy", specifier = ">=1.18.2" },
     { name = "pytest", specifier = ">=8.4.2" },
     { name = "pytest-cov", specifier = ">=7.0.0" },
     { name = "ruff", specifier = ">=0.13.3" },
     { name = "twine", specifier = ">=6.2.0" },
     { name = "yamllint", specifier = ">=1.37.1" },
+]
+
+[[package]]
+name = "flepimop2-fetch"
+version = "0.3.0.dev0"
+source = { editable = "packages/flepimop2-fetch" }
+dependencies = [
+    { name = "flepimop2" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "flepimop2", specifier = ">=0.3.0,<1.0.0" },
+    { name = "pydantic", specifier = ">=2.12.4" },
 ]
 
 [[package]]
@@ -740,6 +773,21 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "flepimop2", specifier = ">=0.3.0,<1.0.0" }]
+
+[[package]]
+name = "flepimop2-transform"
+version = "0.3.0.dev0"
+source = { editable = "packages/flepimop2-transform" }
+dependencies = [
+    { name = "flepimop2" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "flepimop2", specifier = ">=0.3.0,<1.0.0" },
+    { name = "pydantic", specifier = ">=2.12.4" },
+]
 
 [[package]]
 name = "fqdn"
