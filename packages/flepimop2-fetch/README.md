@@ -51,10 +51,11 @@ process:
 The provider validates that `script` is an executable file, then runs:
 
 ```text
-fetch_s3.py <args> --source <source> --target <temporary-path>
+fetch_s3.py <args> <source> <temporary-path>
 ```
 
-The final source and target options are provider-owned. The script must create
-the temporary target and return successfully; only then is the configured
-target replaced atomically. URL-only options such as `sha256`, `timeout`, and
-`user_agent` are intentionally unavailable on this specialization.
+The final source and target positions are provider-owned. The script must
+create the temporary target and return successfully; only then is the
+configured target replaced atomically. URL-only options such as `sha256`,
+`timeout`, and `user_agent` are intentionally unavailable on this
+specialization.

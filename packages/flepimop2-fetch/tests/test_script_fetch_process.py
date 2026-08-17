@@ -37,8 +37,8 @@ import argparse
 from pathlib import Path
 p = argparse.ArgumentParser()
 p.add_argument('--prefix', required=True)
-p.add_argument('--source', required=True)
-p.add_argument('--target', required=True)
+p.add_argument('source')
+p.add_argument('target')
 a = p.parse_args()
 Path(a.target).write_text(f'{a.prefix}:{a.source}')
 """,
@@ -48,10 +48,10 @@ Path(a.target).write_text(f'{a.prefix}:{a.source}')
     return path
 
 
-def test_script_fetches_non_http_source_with_structured_arguments(
+def test_script_fetches_non_http_source_with_positional_interface(
     tmp_path: Path,
 ) -> None:
-    """The script specialization receives controlled source and target options."""
+    """The script receives source and target after its configured arguments."""
     target = tmp_path / "artifact.txt"
     process = ScriptFetchProcess(
         source="s3://example-bucket/item",

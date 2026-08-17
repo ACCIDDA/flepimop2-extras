@@ -34,14 +34,14 @@ Argument: TypeAlias = str | int | float
 class ScriptFetchProcess(FetchProcessABC, module="script_fetch"):
     """Delegate source-specific fetching to an executable script.
 
-    The provider controls the final two options passed to the script:
-    `--source <source> --target <temporary-path>`. The script owns source
-    validation and must create the temporary target before returning success.
+    The provider controls the final two positional arguments passed to the
+    script: `<source> <temporary-path>`. The script owns source validation and
+    must create the temporary target before returning success.
 
     Attributes:
         source: Identifier understood by `script`.
         script: Executable implementing the custom fetch.
-        args: Literal arguments passed before the provider-owned options.
+        args: Literal arguments passed before the provider-owned positions.
         target: Local file the process promises to materialize.
     """
 
@@ -61,9 +61,7 @@ class ScriptFetchProcess(FetchProcessABC, module="script_fetch"):
         return [
             str(self.script),
             *(str(argument) for argument in self.args),
-            "--source",
             self.source,
-            "--target",
             str(target),
         ]
 
