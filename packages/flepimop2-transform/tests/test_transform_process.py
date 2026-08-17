@@ -19,7 +19,9 @@ import stat
 from pathlib import Path
 
 import pytest
+from flepimop2.configuration import ConfigurationModel
 from flepimop2.exceptions import Flepimop2ValidationError
+from flepimop2.process.abc import build
 from flepimop2.process.transform import TransformProcess
 
 
@@ -37,9 +39,11 @@ p = argparse.ArgumentParser()
 p.add_argument('--source', action='append', required=True)
 p.add_argument('--target', required=True)
 p.add_argument('--uppercase', action='store_true')
+p.add_argument('--repeat', type=int, default=1)
 a = p.parse_args()
 text = ''.join(Path(source).read_text() for source in a.source)
-Path(a.target).write_text(text.upper() if a.uppercase else text)
+text = text.upper() if a.uppercase else text
+Path(a.target).write_text(text * a.repeat)
 """,
         encoding="utf-8",
     )
@@ -102,3 +106,71 @@ def test_transform_dry_run_does_not_write(
     process.execute(dry_run=True)
     assert not target.exists()
     assert f"--source {source} --target {target}" in capsys.readouterr().out
+
+
+def test_transform_converts_numeric_configuration_arguments(tmp_path: Path) -> None:
+    """Numeric values reused from YAML configuration become script arguments."""
+    source = tmp_path / "source.txt"
+    source.write_text("hello", encoding="utf-8")
+    target = tmp_path / "target.txt"
+    process = TransformProcess(
+        sources=[source],
+        script=_script(tmp_path / "transform.py"),
+        args=["--repeat", 2],
+        target=target,
+    )
+
+    process.execute()
+
+    assert target.read_text(encoding="utf-8") == "hellohello"
+
+
+def test_transform_reuses_fixed_parameter_through_yaml_anchor() -> None:
+    """A YAML anchor can pass a static parameter value into script arguments."""
+    config = ConfigurationModel.safe_load("""
+parameters:
+  missingness_cutoff: &missingness_cutoff 0.15
+process:
+  clean_observations:
+    module: transform
+    sources: [.cache/raw.csv]
+    script: ./clean.py
+    args: [--max-missing, *missingness_cutoff]
+    target: .cache/clean.csv
+""")
+
+    process = build(config.process["clean_observations"])
+
+    assert isinstance(process, TransformProcess)
+    assert process.args == ["--max-missing", 0.15]
+
+
+@pytest.mark.parametrize(
+    ("force", "expected"),
+    [
+        (False, "would skip transform; target already exists"),
+        (True, "would replace existing transform target"),
+    ],
+)
+def test_transform_dry_run_reports_force_decision_for_existing_target(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    *,
+    force: bool,
+    expected: str,
+) -> None:
+    """Dry-run mirrors the selected skip or replace behavior."""
+    source = tmp_path / "source.txt"
+    source.write_text("hello", encoding="utf-8")
+    target = tmp_path / "target.txt"
+    target.write_text("cached", encoding="utf-8")
+    process = TransformProcess(
+        sources=[source], script=_script(tmp_path / "transform.py"), target=target
+    )
+
+    process.execute(dry_run=True, force=force)
+
+    captured = capsys.readouterr().out
+    assert expected in captured
+    assert ("would run:" in captured) is force
+    assert target.read_text(encoding="utf-8") == "cached"

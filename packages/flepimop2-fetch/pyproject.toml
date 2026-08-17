@@ -1,7 +1,7 @@
 [project]
 name = "flepimop2-fetch"
 version = "0.3.0dev"
-description = "A cached URL-fetch process provider for flepimop2."
+description = "Cached URL and script fetch process providers for flepimop2."
 readme = "README.md"
 license = "GPL-3.0-or-later"
 authors = [

@@ -18,22 +18,38 @@
 __all__ = ["TransformProcess"]
 
 import os
+import shlex
 import subprocess  # noqa: S404
 import tempfile
 import warnings
 from pathlib import Path
+from typing import TypeAlias
 
 from flepimop2.exceptions import Flepimop2ValidationError, ValidationIssue
 from flepimop2.process.abc import ProcessABC
 from pydantic import Field
 
+Argument: TypeAlias = str | int | float
+
 
 class TransformProcess(ProcessABC, module="transform"):
-    """Transform explicit source files into one durable target."""
+    """Transform explicit source files into one durable target.
+
+    The script receives configured `args`, one `--source <path>` pair per
+    source, and a final `--target <temporary-path>` pair owned by the provider.
+    Scalar arguments are converted to strings when the command is built, so
+    YAML anchors can reuse literal numeric configuration values.
+
+    Attributes:
+        sources: Input files passed in their configured order.
+        script: Executable responsible for creating the temporary target.
+        args: Literal arguments passed before provider-owned options.
+        target: File atomically replaced after the script succeeds.
+    """
 
     sources: list[Path] = Field(min_length=1)
     script: Path
-    args: list[str] = Field(default_factory=list)
+    args: list[Argument] = Field(default_factory=list)
     target: Path
 
     def execute(self, *, dry_run: bool = False, force: bool = False) -> None:
@@ -49,14 +65,20 @@ class TransformProcess(ProcessABC, module="transform"):
         if (result := self._process_validate()) is not None and result:
             raise Flepimop2ValidationError(result)
         if not force and self.is_satisfied():
-            print(f"target already exists: {self.target}; use --force to replace it")  # noqa: T201
+            prefix = "would skip transform; " if dry_run else ""
+            print(  # noqa: T201
+                f"{prefix}target already exists: {self.target}; "
+                "use --force to replace it"
+            )
             return
         if force and self.target.exists():
-            warnings.warn(
-                f"replacing existing transform target: {self.target}",
-                RuntimeWarning,
-                stacklevel=2,
-            )
+            message = f"replacing existing transform target: {self.target}"
+            if dry_run:
+                print(  # noqa: T201
+                    f"would replace existing transform target: {self.target}"
+                )
+            else:
+                warnings.warn(message, RuntimeWarning, stacklevel=2)
         self._process(dry_run=dry_run)
 
     def is_satisfied(self) -> bool:
@@ -99,18 +121,29 @@ class TransformProcess(ProcessABC, module="transform"):
             )
         return issues or None
 
+    def _command(self, target: Path) -> list[str]:
+        """Build the controlled script command for a target path.
+
+        Args:
+            target: Path the script must materialize.
+
+        Returns:
+            The executable and its complete argument vector.
+        """
+        prefix = [str(self.script), *(str(argument) for argument in self.args)]
+        source_args = [
+            item for source in self.sources for item in ("--source", str(source))
+        ]
+        return [*prefix, *source_args, "--target", str(target)]
+
     def _process(self, *, dry_run: bool) -> None:
         """Run the script and atomically replace the target.
 
         Raises:
             RuntimeError: If the script does not materialize its temporary target.
         """
-        prefix = [str(self.script), *self.args]
-        source_args = [
-            item for source in self.sources for item in ("--source", str(source))
-        ]
         if dry_run:
-            print(" ".join([*prefix, *source_args, "--target", str(self.target)]))  # noqa: T201
+            print(f"would run: {shlex.join(self._command(self.target))}")  # noqa: T201
             return
         self.target.parent.mkdir(parents=True, exist_ok=True)
         temporary: Path | None = None
@@ -123,9 +156,7 @@ class TransformProcess(ProcessABC, module="transform"):
             ) as placeholder:
                 temporary = Path(placeholder.name)
             temporary.unlink()
-            subprocess.run(  # noqa: S603
-                [*prefix, *source_args, "--target", str(temporary)], check=True
-            )
+            subprocess.run(self._command(temporary), check=True)  # noqa: S603
             if not temporary.is_file():
                 msg = f"transform script did not materialize target: {temporary}"
                 raise RuntimeError(msg)

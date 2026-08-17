@@ -16,7 +16,6 @@
 """Tests for the cached fetch process."""
 
 import hashlib
-import stat
 import threading
 from collections.abc import Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -25,6 +24,7 @@ from typing import ClassVar
 
 import pytest
 from flepimop2.process.fetch import FetchProcess
+from pydantic import ValidationError
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -90,31 +90,23 @@ def test_force_refetches_cached_artifact(tmp_path: Path, source_url: str) -> Non
     assert _Handler.requests == 1 + 1
 
 
-def test_custom_script_fetches_non_http_source(tmp_path: Path) -> None:
-    """A custom strategy receives structured source and target arguments."""
-    script = tmp_path / "fetch.py"
-    script.write_text(
-        """#!/usr/bin/env python3
-import argparse
-from pathlib import Path
-p = argparse.ArgumentParser()
-p.add_argument('--prefix', required=True)
-p.add_argument('--source', required=True)
-p.add_argument('--target', required=True)
-a = p.parse_args()
-Path(a.target).write_text(f'{a.prefix}:{a.source}')
-""",
-        encoding="utf-8",
-    )
-    script.chmod(script.stat().st_mode | stat.S_IXUSR)
-    target = tmp_path / "artifact.txt"
-    process = FetchProcess(
-        source="custom:item", script=script, args=["--prefix", "fetched"], target=target
-    )
+def test_url_fetch_rejects_non_http_source(tmp_path: Path) -> None:
+    """The URL specialization rejects identifiers owned by custom scripts."""
+    with pytest.raises(ValidationError, match="URL scheme should be 'http' or 'https'"):
+        FetchProcess.model_validate({
+            "source": "s3://example-bucket/artifact.csv",
+            "target": tmp_path / "artifact.csv",
+        })
 
-    process.execute()
 
-    assert target.read_text(encoding="utf-8") == "fetched:custom:item"
+def test_url_fetch_rejects_script_options(tmp_path: Path, source_url: str) -> None:
+    """Script execution cannot silently weaken the URL provider's validation."""
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        FetchProcess.model_validate({
+            "source": source_url,
+            "script": tmp_path / "fetch.py",
+            "target": tmp_path / "artifact.csv",
+        })
 
 
 def test_sha256_mismatch_keeps_existing_artifact(
@@ -149,6 +141,23 @@ def test_matching_sha256_is_satisfied(tmp_path: Path, source_url: str) -> None:
     process.execute()
 
     assert process.is_satisfied()
+    assert _Handler.requests == 1
+
+
+def test_sha256_satisfaction_reads_only_local_target(
+    tmp_path: Path, source_url: str
+) -> None:
+    """Checking a pre-known digest never pulls the remote object."""
+    output = tmp_path / "observations.csv"
+    output.write_bytes(_Handler.body)
+    process = FetchProcess.model_validate({
+        "source": source_url,
+        "target": output,
+        "sha256": hashlib.sha256(_Handler.body).hexdigest(),
+    })
+
+    assert process.is_satisfied()
+    assert _Handler.requests == 0
 
 
 def test_dry_run_does_not_fetch(
@@ -162,4 +171,33 @@ def test_dry_run_does_not_fetch(
 
     assert not output.exists()
     assert _Handler.requests == 0
-    assert f"fetch {source_url} -> {output}" in capsys.readouterr().out
+    assert f"would fetch {source_url} -> {output}" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    ("force", "expected"),
+    [
+        (False, "would skip fetch; target already exists"),
+        (True, "would replace existing fetch target"),
+    ],
+)
+def test_dry_run_reports_force_decision_for_existing_target(
+    tmp_path: Path,
+    source_url: str,
+    capsys: pytest.CaptureFixture[str],
+    *,
+    force: bool,
+    expected: str,
+) -> None:
+    """Dry-run selects the same skip or replace branch as real execution."""
+    output = tmp_path / "observations.csv"
+    output.write_bytes(b"cached")
+    process = FetchProcess.model_validate({"source": source_url, "target": output})
+
+    process.execute(dry_run=True, force=force)
+
+    captured = capsys.readouterr().out
+    assert expected in captured
+    assert ("would fetch" in captured) is force
+    assert output.read_bytes() == b"cached"
+    assert _Handler.requests == 0

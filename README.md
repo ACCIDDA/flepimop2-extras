@@ -46,12 +46,13 @@ Below is an index of the current packages included in `flepimop2-extras`.
 - `flepimop2-extras` Extras: The extra groups that the module is included in.
 - Documentation: Link to the documentation for the module.
 
-| Module Name   | Module Type | Package                 | `flepimop2-extras` Extras | Documentation                                    |
-| ------------- | ----------- | ----------------------- | ------------------------- | ------------------------------------------------ |
-| `fetch`       | `process`   | `flepimop2-fetch`       | `all`, `fetch`            | [Link](packages/flepimop2-fetch/README.md)       |
-| `ipynbrender` | `process`   | `flepimop2-ipynbrender` | `all`, `ipynbrender`      | [Link](packages/flepimop2-ipynbrender/README.md) |
-| `slurm`       | `job`       | `flepimop2-slurm`       | `all`, `slurm`            | [Link](packages/flepimop2-slurm/README.md)       |
-| `transform`   | `process`   | `flepimop2-transform`   | `all`, `transform`        | [Link](packages/flepimop2-transform/README.md)   |
+| Module Name    | Module Type | Package                 | `flepimop2-extras` Extras | Documentation                                    |
+| -------------- | ----------- | ----------------------- | ------------------------- | ------------------------------------------------ |
+| `fetch`        | `process`   | `flepimop2-fetch`       | `all`, `fetch`            | [Link](packages/flepimop2-fetch/README.md)       |
+| `ipynbrender`  | `process`   | `flepimop2-ipynbrender` | `all`, `ipynbrender`      | [Link](packages/flepimop2-ipynbrender/README.md) |
+| `script_fetch` | `process`   | `flepimop2-fetch`       | `all`, `fetch`            | [Link](packages/flepimop2-fetch/README.md)       |
+| `slurm`        | `job`       | `flepimop2-slurm`       | `all`, `slurm`            | [Link](packages/flepimop2-slurm/README.md)       |
+| `transform`    | `process`   | `flepimop2-transform`   | `all`, `transform`        | [Link](packages/flepimop2-transform/README.md)   |
 
 ## Contributing
 
