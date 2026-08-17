@@ -36,11 +36,18 @@ classifiers = [
 # Keep `all` in sync with the union of the individual extras as packages are added.
 [project.optional-dependencies]
 ipynbrender = ["flepimop2-ipynbrender"]
+fetch = ["flepimop2-fetch"]
 slurm = ["flepimop2-slurm"]
-all = ["flepimop2-ipynbrender", "flepimop2-slurm"]
+transform = ["flepimop2-transform"]
+all = [
+    "flepimop2-fetch",
+    "flepimop2-ipynbrender",
+    "flepimop2-slurm",
+    "flepimop2-transform",
+]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.30.1,<1.31"]
 build-backend = "hatchling.build"
 
 # Single source of truth for values shared across every package in the
@@ -62,8 +69,10 @@ members = ["packages/*"]
 # strips `tool.uv.sources` from built artifacts, so the published metapackage
 # depends on the packages from PyPI rather than these local paths.
 [tool.uv.sources]
+flepimop2-fetch = { workspace = true }
 flepimop2-ipynbrender = { workspace = true }
 flepimop2-slurm = { workspace = true }
+flepimop2-transform = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -75,8 +84,10 @@ dev = [
     "twine>=6.2.0",
     "yamllint>=1.37.1",
     # Member packages, so a single `uv sync` installs the whole workspace.
+    "flepimop2-fetch",
     "flepimop2-ipynbrender",
     "flepimop2-slurm",
+    "flepimop2-transform",
 ]
 
 [tool.pytest.ini_options]
@@ -124,7 +135,7 @@ allow-star-arg-any = true
 convention = "google"
 
 [tool.mypy]
-mypy_path = ["packages/flepimop2-ipynbrender/src", "packages/flepimop2-slurm/src"]
+mypy_path = ["packages/flepimop2-fetch/src", "packages/flepimop2-ipynbrender/src", "packages/flepimop2-slurm/src", "packages/flepimop2-transform/src"]
 files = "."
 exclude = [
     "^build/",
