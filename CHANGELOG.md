@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Documentation
+
+- Replace metapackage Git-install examples that could not resolve unpublished
+  providers with commands supplying local packages in the same pip invocation.
+  Describe the source-only alpha status and distinguish the distributable
+  metapackage from its development workspace.
+
 ### Fixed
 
 - Return validation issue lists from the notebook process and Slurm submission
