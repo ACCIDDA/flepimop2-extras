@@ -1,8 +1,8 @@
 # `flepimop2-extras`
 
-A collection of common modules that are used frequently in practice in conjunction with `flepimop2`. 
-
-These modules have been separated from core `flepimop2` because they're specialized or require major dependencies. It also makes it much easier for developers to contribute/work on individual modules without having to think about affecting core `flepimop2` pipeline elements.
+`flepimop2-extras` contains optional provider packages for `flepimop2`.
+They are maintained separately from the core because they serve specialized
+workflows or require additional dependencies.
 
 ## Installation
 
@@ -23,7 +23,9 @@ To install other packages directly you can replace `flepimop2-ipynbrender` in th
 
 ### Installing From the `flepimop2-extras` Meta Package
 
-To make working on the codebase easier for the developers of this package the individual packages are managed via a [`uv` workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/). This means that the dependencies across all constituent packages are consistently managed together and the `flepimop2-extras` package is a thin meta package. You can install the desired modules by installing `flepimop2-extras` package with the appropriate extra:
+The packages share development dependencies through a
+[`uv` workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/).
+The `flepimop2-extras` metapackage installs providers through optional extras:
 
 ```bash
 # If you want to install the `flepimop2-ipynbrender` module:

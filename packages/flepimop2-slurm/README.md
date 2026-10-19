@@ -1,8 +1,9 @@
 # `flepimop2-slurm`
 
-An external provider package for [flepimop2](https://github.com/ACCIDDA/flepimop2) that provides a `SlurmJob` class for submitting jobs to Slurm-managed HPC clusters.
+`flepimop2-slurm` supplies the `SlurmJob` provider for submitting
+[flepimop2](https://github.com/ACCIDDA/flepimop2) commands to Slurm clusters.
 
-This package contributes the `slurm` job module to the `flepimop2.job` namespace. Once installed, flepimop2 configurations can reference it via:
+After installation, select `module: slurm` in a job configuration:
 
 ```yaml
 job:
@@ -12,13 +13,13 @@ job:
 
 ## Installation
 
-Like other packages in the `flepimop2-extras` package it can either be installed directly via:
+Install the provider directly:
 
 ```bash
 pip install "flepimop2-slurm@git+https://github.com/ACCIDDA/flepimop2-extras.git@main#subdirectory=packages/flepimop2-slurm"
 ```
 
-or as a part of a dependency group in `flepimop2-extras` if you're using multiple modules from this package:
+Or install it through a `flepimop2-extras` optional dependency group:
 
 ```bash
 pip install "flepimop2-extras[slurm]@git+https://github.com/ACCIDDA/flepimop2-extras.git@main"
@@ -27,6 +28,18 @@ pip install "flepimop2-extras[all]@git+https://github.com/ACCIDDA/flepimop2-extr
 ```
 
 ## Configuration
+
+| Example request | Scheduler meaning | Interpretation |
+| --- | --- | --- |
+| `cpus-per-task: 2`, `ntasks: 2` | Two tasks requesting two CPUs each | Allocated resources; model parallelism needs its own execution configuration. |
+| `nodes: 1` | One requested node | Does not choose a numerical backend. |
+| `memory: 4G` | Node memory request | Separate from application-specific memory limits. |
+| `time: 2:45:00` | Requested wall time | Separate from a model's simulated time span. |
+| `pre-commands` / `post-commands` | Shell setup / cleanup | Keep environment setup explicit and portable. |
+
+The job provider schedules a command. The system and engine providers still
+define and integrate the scientific model; process providers handle separately
+configured analysis and reporting steps.
 
 The slurm module can be configured in your YAML configuration file with the following settings:
 
@@ -44,7 +57,7 @@ job:
 
 - `cpus-per-task`: Corresponds directly to `sbatch`'s [`--cpus-per-task` option](https://slurm.schedmd.com/sbatch.html#OPT_cpus-per-task). This times the number of tasks will determine the number of CPUs to request.
 - `memory`: Corresponds directly to `sbatch`'s [`--mem` option](https://slurm.schedmd.com/sbatch.html#OPT_mem). Should either be an int/float if specified in megabytes or if a string should specify its unit as a single string, e.g. '45.67G' or '1t'.
-- `nodes`: Corresponds directly to `sbatch`'s [`--nodes` option](https://slurm.schedmd.schedmd.com/sbatch.html#OPT_nodes).
+- `nodes`: Corresponds directly to `sbatch`'s [`--nodes` option](https://slurm.schedmd.com/sbatch.html#OPT_nodes).
 - `ntasks`: Corresponds directly to `sbatch`'s [`--ntasks` option](https://slurm.schedmd.com/sbatch.html#OPT_ntasks).
 - `time`: Corresponds directly to `sbatch`'s [`--time` option](https://slurm.schedmd.com/sbatch.html#OPT_time). Can either be specified as slurm formatted duration string or as a [RFC 3339](https://datatracker.ietf.org/doc/html/rfc3339) string.
 - `chdir`: Corresponds directly to `sbatch`'s [`--chdir` option](https://slurm.schedmd.com/sbatch.html#OPT_chdir). If not specified defaults to the current working directory which is typically the desired behavior.
