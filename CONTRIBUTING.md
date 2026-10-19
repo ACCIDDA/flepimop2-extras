@@ -9,9 +9,8 @@ conventions, and tips for best practices.
 `flepimop2-extras` is a collection of external provider packages for
 [`flepimop2`](https://github.com/ACCIDDA/flepimop2), with one package per
 module. It is structured as a [`uv` workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/):
-the repository root is a non-distributable workspace coordinator that holds the
-shared development tooling, while each distributable package lives under
-`packages/`.
+the repository root is a distributable, code-free metapackage that also holds
+shared development tooling. Provider packages live under `packages/`.
 
 ```
 flepimop2-extras/
@@ -80,11 +79,12 @@ workspace root in `pyproject.toml`. Packages should not redefine this
 configuration.
 
 The repository root is a metapackage: `flepimop2-extras` ships no code of its
-own but exposes each provider package as an optional dependency, so users can
-run `pip install 'flepimop2-extras[slurm]'` to pull in `flepimop2-slurm`, or
-`pip install 'flepimop2-extras[all]'` to install everything. (`tool.uv.sources`
-is a development-only override that uv strips from the published artifact, so
-the metapackage depends on the packages from PyPI.)
+own but exposes each provider package as an optional dependency. These packages
+are not yet published on PyPI. Follow the root README's source installation
+commands, supplying local providers alongside the selected extra, or use
+`uv sync --all-packages` for development. `tool.uv.sources` resolves workspace
+members during development; published artifacts declare package-name dependencies
+and do not retain those local overrides.
 
 ### Adding a New Package
 

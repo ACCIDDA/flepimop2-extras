@@ -6,14 +6,14 @@ workflows or require additional dependencies.
 
 ## Installation
 
-Packages in this repository can be installed by a user one of two ways:
+These alpha packages currently use the shared development version `0.3.0dev`.
+They are available from source; the metapackage and its providers have not been
+published on PyPI. Use a virtual environment and one of the source options below.
 
-1) Installing the module package directly, or
-2) Installing modules via the `flepimop2-extras` meta package.
 
 ### Installing Directly
 
-For example, suppose you want to install the `flepimop2-ipynbrender` package with provides the `ipynbrender` process module:
+For example, install the notebook-rendering provider directly:
 
 ```bash
 pip install "flepimop2-ipynbrender@git+https://github.com/ACCIDDA/flepimop2-extras.git@main#subdirectory=packages/flepimop2-ipynbrender"
@@ -23,20 +23,26 @@ To install other packages directly you can replace `flepimop2-ipynbrender` in th
 
 ### Installing From the `flepimop2-extras` Meta Package
 
-The packages share development dependencies through a
-[`uv` workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/).
-The `flepimop2-extras` metapackage installs providers through optional extras:
+The `flepimop2-extras` metapackage declares optional provider dependencies by
+package name. Installing the metapackage from Git alone does not tell pip where
+to obtain those unpublished dependencies. Clone the repository and supply the
+local provider packages in the same installation command:
 
 ```bash
-# If you want to install the `flepimop2-ipynbrender` module:
-pip install "flepimop2-extras[ipynbrender]@git+https://github.com/ACCIDDA/flepimop2-extras.git@main"
+git clone https://github.com/ACCIDDA/flepimop2-extras.git
+cd flepimop2-extras
 
-# If you want to install multiple modules, such as `flepimop2-ipynbrender` and `flepimop2-slurm`:
-pip install "flepimop2-extras[ipynbrender,slurm]@git+https://github.com/ACCIDDA/flepimop2-extras.git@main"
+# One provider through the metapackage:
+python -m pip install ./packages/flepimop2-ipynbrender '.[ipynbrender]'
 
-# If you want to install all modules in the `flepimop2-extras` package:
-pip install "flepimop2-extras[all]@git+https://github.com/ACCIDDA/flepimop2-extras.git@main"
+# All currently included providers through the metapackage:
+python -m pip install ./packages/flepimop2-ipynbrender ./packages/flepimop2-slurm '.[all]'
 ```
+
+For a reproducible installation, check out the desired commit before installing.
+Developers can instead use the repository's
+[`uv` workspace](https://docs.astral.sh/uv/concepts/projects/workspaces/) with
+`uv sync --all-packages`; see [Contributing](CONTRIBUTING.md).
 
 ## Package Index
 

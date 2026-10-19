@@ -21,13 +21,16 @@ Install the provider directly:
 pip install "flepimop2-ipynbrender@git+https://github.com/ACCIDDA/flepimop2-extras.git@main#subdirectory=packages/flepimop2-ipynbrender"
 ```
 
-Or install it through a `flepimop2-extras` optional dependency group:
+The provider and metapackage are source-only alpha packages. To select the
+provider through the metapackage, clone the repository and run this from its
+root so pip can resolve the unpublished provider locally:
 
 ```bash
-pip install "flepimop2-extras[ipynbrender]@git+https://github.com/ACCIDDA/flepimop2-extras.git@main"
-# or
-pip install "flepimop2-extras[all]@git+https://github.com/ACCIDDA/flepimop2-extras.git@main"
+python -m pip install ./packages/flepimop2-ipynbrender '.[ipynbrender]'
 ```
+
+See the [repository installation instructions](../../README.md#installation)
+for installing all providers or using the development workspace.
 
 ## Configuration
 
