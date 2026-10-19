@@ -1,8 +1,9 @@
 # `flepimop2-ipynbrender`
 
-An external provider package for [flepimop2](https://github.com/ACCIDDA/flepimop2) that provides a `IpynbRenderProcess` class for rendering jupyter notebooks as a processing step.
+`flepimop2-ipynbrender` supplies the `IpynbRenderProcess` provider for rendering
+Jupyter notebooks as a [flepimop2](https://github.com/ACCIDDA/flepimop2) processing step.
 
-This package contributes the `ipynbrender` process module to the `flepimop2.process` namespace. Once installed, flepimop2 configurations can reference it via:
+After installation, select `module: ipynbrender` in a process configuration:
 
 ```yaml
 process:
@@ -14,13 +15,13 @@ process:
 
 ## Installation
 
-Like other packages in the `flepimop2-extras` package it can either be installed directly via:
+Install the provider directly:
 
 ```bash
 pip install "flepimop2-ipynbrender@git+https://github.com/ACCIDDA/flepimop2-extras.git@main#subdirectory=packages/flepimop2-ipynbrender"
 ```
 
-or as a part of a dependency group in `flepimop2-extras` if you're using multiple modules from this package:
+Or install it through a `flepimop2-extras` optional dependency group:
 
 ```bash
 pip install "flepimop2-extras[ipynbrender]@git+https://github.com/ACCIDDA/flepimop2-extras.git@main"
