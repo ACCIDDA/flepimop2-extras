@@ -56,13 +56,13 @@ class IpynbRenderProcess(ProcessABC, module="ipynbrender"):
 
     _jupyter: str | None = PrivateAttr(default_factory=lambda: which("jupyter"))
 
-    def _process_validate(self) -> list[ValidationIssue] | None:
+    def _process_validate(self) -> list[ValidationIssue]:
         """
         Process validation hook.
 
         Returns:
             A list of validation issues indicating if the jupyter notebook given is not
-            in valid notebook format, otherwise `None`.
+            in valid notebook format, or an empty list if valid.
 
         """
         validation_issues: list[ValidationIssue] = []
@@ -86,9 +86,7 @@ class IpynbRenderProcess(ProcessABC, module="ipynbrender"):
                     ctx={"location": str(self.file)},
                 )
             )
-        if validation_issues:
-            return validation_issues
-        return None
+        return validation_issues
 
     def _process(self, *, dry_run: bool) -> None:
         """

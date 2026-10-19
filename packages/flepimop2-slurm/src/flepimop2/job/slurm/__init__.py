@@ -567,7 +567,7 @@ class SlurmJob(JobABC, module="slurm"):
         return JobHandle(job_id=job_id, backend="slurm")
 
     @staticmethod
-    def _submit_validate() -> list[ValidationIssue] | None:
+    def _submit_validate() -> list[ValidationIssue]:
         """Validate that this backend is ready to accept submissions.
 
         Called by `submit` before delegating to `_submit`. Subclasses may
@@ -576,13 +576,12 @@ class SlurmJob(JobABC, module="slurm"):
 
         Returns:
             A list of `ValidationIssue` objects if validation fails, an empty
-            list if validation passes with no issues, or `None` if not
-            implemented.
+            list if validation passes with no issues.
         """
         if which("sbatch") is None:
             msg = "SlurmJob requires the 'sbatch' executable to be available in PATH"
             return [ValidationIssue(msg=msg, kind="executable_not_found")]
-        return None
+        return []
 
     def _status(self, handle: JobHandle) -> JobStatusResult:
         """Report the status of a previously submitted Slurm job via `seff`.

@@ -78,6 +78,21 @@ def _slurm_job_config(**overrides: Any) -> dict[str, Any]:
     } | overrides
 
 
+@pytest.mark.parametrize("available", [True, False])
+def test_slurm_submit_validation_returns_issue_list(
+    monkeypatch: pytest.MonkeyPatch, *, available: bool
+) -> None:
+    """Validate prerequisites without submitting jobs, including successful checks."""
+    monkeypatch.setattr(
+        slurm_module, "which", lambda _: "/usr/bin/sbatch" if available else None
+    )
+    issues = SlurmJob._submit_validate()
+    assert isinstance(issues, list)
+    assert [issue.kind for issue in issues] == (
+        [] if available else ["executable_not_found"]
+    )
+
+
 def test_slurm_job_accepts_string_commands() -> None:
     """`SlurmJob` accepts command strings for pre and post commands."""
     pre_commands = "if [ -f foo ]; then\n  echo found\nfi"
