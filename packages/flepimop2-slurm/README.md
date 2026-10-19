@@ -28,6 +28,18 @@ pip install "flepimop2-extras[all]@git+https://github.com/ACCIDDA/flepimop2-extr
 
 ## Configuration
 
+| Example request | Scheduler meaning | Interpretation |
+| --- | --- | --- |
+| `cpus-per-task: 2`, `ntasks: 2` | Two tasks requesting two CPUs each | Allocated resources; model parallelism needs its own execution configuration. |
+| `nodes: 1` | One requested node | Does not choose a numerical backend. |
+| `memory: 4G` | Node memory request | Separate from application-specific memory limits. |
+| `time: 2:45:00` | Requested wall time | Separate from a model's simulated time span. |
+| `pre-commands` / `post-commands` | Shell setup / cleanup | Keep environment setup explicit and portable. |
+
+The job provider schedules a command. The system and engine providers still
+define and integrate the scientific model; process providers handle separately
+configured analysis and reporting steps.
+
 The slurm module can be configured in your YAML configuration file with the following settings:
 
 ```yaml

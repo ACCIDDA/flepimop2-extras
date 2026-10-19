@@ -2,12 +2,14 @@
 
 An external provider package for [flepimop2](https://github.com/ACCIDDA/flepimop2) that provides a `IpynbRenderProcess` class for rendering jupyter notebooks as a processing step.
 
-This package contributes the `ipynbrender` process module to the `flepimop2.prcoess` namespace. Once installed, flepimop2 configurations can reference it via:
+This package contributes the `ipynbrender` process module to the `flepimop2.process` namespace. Once installed, flepimop2 configurations can reference it via:
 
 ```yaml
-job:
-  module: 'ipynbrender'
-  ...
+process:
+  report:
+    module: ipynbrender
+    file: ./analysis/report.ipynb
+    output: ./model_output/report.html
 ```
 
 ## Installation
@@ -27,6 +29,19 @@ pip install "flepimop2-extras[all]@git+https://github.com/ACCIDDA/flepimop2-extr
 ```
 
 ## Configuration
+
+| Item | Example | Role |
+| --- | --- | --- |
+| Configuration section | `process.report` | A named processing step |
+| Input | `analysis/report.ipynb` | An existing notebook, including its stored outputs |
+| Output | `model_output/report.html` | Rendered report; format is inferred from its extension |
+| Optional format | `format: html` | Explicit nbconvert output format |
+| Optional version | `version: 4` | Notebook format used while reading and validating |
+
+The provider invokes `jupyter nbconvert` to render stored notebook outputs.
+It does not add `--execute`, so run the analysis that produces figures and
+tables before rendering. PDF and browser-based formats require nbconvert's
+corresponding external tools; HTML is a convenient first example.
 
 The `ipynbrender` module can be configured in your YAML configuration file with the following settings:
 
