@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- Support core PR #374's dependency-aware process plans in the Slurm provider,
+  using `cmd_queue` to submit one job per step with `afterok` dependencies.
+  Advertise `supports_plan`, inherit core's public submission validation, and
+  return per-step handles for core caching. Include dry runs and partial-failure
+  journals. Development is pinned to core commit `38013b0`; this feature requires
+  the unreleased core API and is not compatible with flepimop2 0.3.0.
+
 ### Documentation
 
 - Replace metapackage Git-install examples that could not resolve unpublished

@@ -27,7 +27,7 @@ import subprocess  # noqa: S404
 from pathlib import Path
 from shutil import which
 from tempfile import mkdtemp
-from typing import Final
+from typing import ClassVar, Final
 from zlib import adler32
 
 from flepimop2.cli import CliCommand
@@ -41,7 +41,9 @@ from flepimop2.job.abc import (
 )
 from flepimop2.job.slurm._command_list import CommandList
 from flepimop2.job.slurm._memory_str import MemoryStr
+from flepimop2.job.slurm._plan import submit_plan  # noqa: PLC2701
 from flepimop2.job.slurm._slurm_timedelta import SlurmTimedelta
+from flepimop2.process._plan import ProcessPlan
 from pydantic import ConfigDict, Field, model_validator
 
 _SBATCH_OPTIONS_RESERVED_KEYS: Final[frozenset[str]] = frozenset({
@@ -126,6 +128,8 @@ class SlurmJob(JobABC, module="slurm"):
             not specified or `None` a temporary directory will be used. It can be
             helpful for debugging or for keeping a record of the sbatch files.
     """
+
+    supports_plan: ClassVar[bool] = True
 
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
@@ -565,6 +569,20 @@ class SlurmJob(JobABC, module="slurm"):
         )
         job_id = self._parse_sbatch_job_id(result.stdout)
         return JobHandle(job_id=job_id, backend="slurm")
+
+    def _submit_plan(
+        self, plan: ProcessPlan, *, dry_run: bool = False
+    ) -> dict[str, JobHandle] | JobDryRun:
+        """Submit one Slurm job per step, preserving prerequisite relationships.
+
+        Commands must execute only their own step; core owns plan construction
+        and process execution. The inherited submit_plan entrypoint owns backend
+        validation. Dry runs render the complete submission without calling Slurm.
+
+        Returns:
+            Per-step job handles, or the rendered submission for a dry run.
+        """
+        return submit_plan(self, plan, dry_run=dry_run)
 
     @staticmethod
     def _submit_validate() -> list[ValidationIssue]:

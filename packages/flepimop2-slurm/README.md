@@ -99,3 +99,44 @@ job:
 ```
 
 - `sbatch-directory`: The directory that the sbatch submission file is written to. If not specified a temporary directory will be created. It can be helpful for debugging purposes to retain these, but these should not be kept in version control as they are generated artifacts.
+
+## Dependency-aware process plans
+
+The provider advertises `supports_plan = True` and implements `_submit_plan`
+for core's inherited `JobABC.submit_plan` entrypoint. It imports `ProcessPlan`
+from `flepimop2.process._plan`; core constructs the plan, validates the module,
+and caches the returned per-step handles.
+
+This integration currently requires core PR #374 at commit
+`38013b063e57cafecefa101909785c617f911d3b`. The workspace's `tool.uv.sources`
+pins that revision for development and CI (`uv sync` / `uv run pytest`).
+Released flepimop2 0.3.0 lacks this API. Before publishing, replace the temporary
+source pin and update the shared core version constraint to a release containing
+that PR; uv source overrides are not included in published dependencies.
+
+Each command is a complete argument vector and must execute only its own
+process. The provider does not expand process prerequisites or add a
+`flepimop2` executable prefix. Core remains responsible for target selection,
+skip/force semantics, and constructing those individual commands.
+
+`cmd_queue` renders one Slurm submission per step, with `afterok` dependencies
+on the prerequisite job IDs. Independent steps can run concurrently. Submission
+returns a dictionary mapping the original step names to `JobHandle` objects;
+it does not wait for the compute jobs to finish. Existing single-command
+submission continues to use `_submit`.
+
+The configured resources, working directory, and pre/post commands apply to
+every step. Step scripts stop on failure, so post-commands run only after a
+successful process. Dependencies control execution order; processes must write
+their outputs to storage accessible by downstream jobs.
+
+A dry run returns `JobDryRun` with the generated submission script path and
+step count, without invoking `sbatch`. Scripts, logs, and a submission journal
+are retained in a unique subdirectory of `sbatch-directory` (or a temporary
+directory). If submission fails midway, `PlanSubmissionError.handles` contains
+the jobs already accepted by Slurm; those jobs are not automatically cancelled.
+
+Plan submissions reserve `dependency`, `array`, `wrap`, `parsable`, `quiet`,
+and `wait` in `sbatch-options` because these conflict with one tracked job per
+step and dependency-aware submission. This implementation expects numeric
+Slurm job IDs and does not support federated `jobid;cluster` responses.

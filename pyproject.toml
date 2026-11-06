@@ -62,6 +62,9 @@ members = ["packages/*"]
 # strips `tool.uv.sources` from built artifacts, so the published metapackage
 # depends on the packages from PyPI rather than these local paths.
 [tool.uv.sources]
+# Temporary development pin: ProcessPlan/submit_plan are pending in core PR #374.
+# Replace with a released core dependency before publishing these changes.
+flepimop2 = { git = "https://github.com/ACCIDDA/flepimop2.git", rev = "38013b063e57cafecefa101909785c617f911d3b" }
 flepimop2-ipynbrender = { workspace = true }
 flepimop2-slurm = { workspace = true }
 
