@@ -75,6 +75,8 @@ def fake_slurm(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         "log.write_text(json.dumps(rows))\n"
         "if len(rows) == int(os.environ.get('SBATCH_FAIL_AT', '0')): sys.exit(1)\n"
         "if os.environ.get('SBATCH_BAD_ID'): print('invalid'); sys.exit(0)\n"
+        "if os.environ.get('SBATCH_BREAK_JOURNAL'):\n"
+        "    pathlib.Path('submitted.tsv').mkdir()\n"
         "print(100 + len(rows))\n",
         encoding="utf-8",
     )
@@ -105,9 +107,14 @@ def test_plan_dependencies_and_handles(
         assert "--mem=1.2T" in call
         assert "--cpus-per-task=2" in call
         assert "--account=test account" in call
-    wrapped = calls[0][calls[0].index("--wrap") + 1]
+    assert all("--wrap" not in call for call in calls)
+    batch = Path(calls[0][-1])
+    assert batch.read_text(encoding="utf-8").startswith("#!/usr/bin/env bash\n")
     result = subprocess.run(  # noqa: S603
-        shlex.split(wrapped), check=True, capture_output=True, text=True
+        ["bash", str(batch)],  # noqa: S607
+        check=True,
+        capture_output=True,
+        text=True,
     )
     assert result.stdout.strip() == "A with spaces; $(false)"
 
@@ -166,8 +173,7 @@ def test_process_failure_is_not_masked(
     provider.post_commands = [shlex.join(["touch", str(marker)])]
     provider.submit_plan({"fail": {"command": ["false"], "depends": []}})
     call = json.loads(fake_slurm.read_text(encoding="utf-8"))[0]
-    wrapped = call[call.index("--wrap") + 1]
-    result = subprocess.run(shlex.split(wrapped), check=False)  # noqa: S603
+    result = subprocess.run(["bash", call[-1]], check=False)  # noqa: S603, S607
     assert result.returncode != 0
     assert not marker.exists()
 
@@ -280,8 +286,8 @@ def test_core_cli_dispatches_slurm_plan(
     assert len(calls) == len(steps)
     assert "--dependency=afterok:101:102" in calls[-1]
     for step, call in zip(steps, calls, strict=True):
-        body = shlex.split(call[call.index("--wrap") + 1])[2]
-        command = shlex.split(body.splitlines()[1])
+        body = Path(call[-1]).read_text(encoding="utf-8")
+        command = shlex.split(body.splitlines()[2])
         assert command[:2] == ["flepimop2", "process"]
         assert command[command.index("--target") + 1] == step
         assert "--no-deps" in command
@@ -291,3 +297,66 @@ def test_core_cli_dispatches_slurm_plan(
     handles = [call.args[0] for call in save_job.call_args_list]
     assert [handle.job_id for handle in handles] == ["101", "102", "103"]
     assert [handle.metadata["step"] for handle in handles] == steps
+
+
+@pytest.mark.parametrize("explicit_output", [False, True])
+def test_logs_do_not_use_submission_temp_directory(
+    provider: SlurmJob,
+    plan: ProcessPlan,
+    fake_slurm: Path,
+    *,
+    explicit_output: bool,
+) -> None:
+    """Compute-node output uses the working directory or the explicit setting."""
+    provider.sbatch_directory = None
+    expected = str(provider.chdir / "slurm-%x-%j.out")
+    if explicit_output:
+        expected = "custom-%j.out"
+        provider.sbatch_options["output"] = expected
+    provider.submit_plan(plan)
+    calls = json.loads(fake_slurm.read_text(encoding="utf-8"))
+    for call in calls:
+        assert f"--output={expected}" in call
+
+
+def test_journal_failure_stops_submission(
+    provider: SlurmJob,
+    plan: ProcessPlan,
+    fake_slurm: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capfd: pytest.CaptureFixture[str],
+) -> None:
+    """A failed append reports the accepted ID and prevents subsequent jobs."""
+    monkeypatch.setenv("SBATCH_BREAK_JOURNAL", "1")
+    with pytest.raises(PlanSubmissionError):
+        provider.submit_plan(plan)
+    assert len(json.loads(fake_slurm.read_text(encoding="utf-8"))) == 1
+    assert (
+        "Failed to record accepted Slurm job 101 (step-0000-A)"
+        in capfd.readouterr().err
+    )
+
+
+def test_batch_preserves_exported_module_function(
+    provider: SlurmJob,
+    fake_slurm: Path,
+    tmp_path: Path,
+) -> None:
+    """Direct Bash batch execution retains an exported environment-module function."""
+    marker = tmp_path / "module-loaded"
+    provider.pre_commands = ["module load example"]
+    provider.submit_plan({"step": {"command": ["true"], "depends": []}})
+    call = json.loads(fake_slurm.read_text(encoding="utf-8"))[0]
+    assert "--wrap" not in call
+    batch = Path(call[-1])
+    assert batch.read_text(encoding="utf-8").startswith("#!/usr/bin/env bash\n")
+    launch = (
+        'module() { printf "%s\\n" "$*" > "$MODULE_MARKER"; }; '
+        'export -f module; exec bash "$1"'
+    )
+    subprocess.run(  # noqa: S603
+        ["bash", "-c", launch, "test", str(batch)],  # noqa: S607
+        check=True,
+        env=os.environ | {"MODULE_MARKER": str(marker)},
+    )
+    assert marker.read_text(encoding="utf-8").strip() == "load example"

@@ -20,6 +20,11 @@
 
 ### Fixed
 
+- Keep default plan-job logs in the configured working directory rather than
+  submission-local temporary storage. Submit Bash batch files directly to retain
+  exported module functions, and stop with an accepted-job diagnostic if writing
+  the submission journal fails.
+
 - Return validation issue lists from the notebook process and Slurm submission
   hooks, including an empty list on success. Support whole-configuration
   validation on merged FlepiMoP2 while retaining public 0.3.0 compatibility

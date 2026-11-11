@@ -127,14 +127,24 @@ submission continues to use `_submit`.
 
 The configured resources, working directory, and pre/post commands apply to
 every step. Step scripts stop on failure, so post-commands run only after a
-successful process. Dependencies control execution order; processes must write
+successful process. Each step is submitted as a Bash-shebang batch file, so an
+intermediate `/bin/sh` cannot strip exported Bash functions such as `module`.
+Dependencies control execution order; processes must write
 their outputs to storage accessible by downstream jobs.
 
 A dry run returns `JobDryRun` with the generated submission script path and
-step count, without invoking `sbatch`. Scripts, logs, and a submission journal
-are retained in a unique subdirectory of `sbatch-directory` (or a temporary
-directory). If submission fails midway, `PlanSubmissionError.handles` contains
+step count, without invoking `sbatch`. Submission scripts, per-step batch files,
+and a submission journal are retained in a unique subdirectory of
+`sbatch-directory` (or a temporary directory). Slurm reads the batch files at
+submission; compute nodes do not need access to that directory. Default job
+stdout/stderr goes to `slurm-%x-%j.out` in the configured working directory,
+which must be compute-visible. Explicit `sbatch-options.output` and `error`
+settings are preserved; their parent directories must also be compute-visible.
+If submission fails midway, `PlanSubmissionError.handles` contains
 the jobs already accepted by Slurm; those jobs are not automatically cancelled.
+If recording an accepted job fails, submission stops immediately and stderr
+reports its job ID and name for recovery. That ID may be absent from the journal
+and exception handles, so retain the submission error output.
 
 Plan submissions reserve `dependency`, `array`, `wrap`, `parsable`, `quiet`,
 and `wait` in `sbatch-options` because these conflict with one tracked job per

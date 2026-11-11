@@ -124,7 +124,7 @@ def submit_plan(  # noqa: PLR0914
     queue.log_dpath = queue.dpath / "logs"
     queue.fpath = queue.dpath / "submit.sh"
     if "output" not in provider.sbatch_options:
-        options.append(f"--output={directory / 'logs' / '%x-%j.out'}")
+        options.append(f"--output={provider.chdir.absolute() / 'slurm-%x-%j.out'}")
     jobs: dict[str, Any] = {}
     names = {}
     for index, name in enumerate(order):
@@ -132,14 +132,17 @@ def submit_plan(  # noqa: PLR0914
         job_name = f"step-{index:04d}-{label}"
         names[job_name] = name
         body = "\n".join([
+            "#!/usr/bin/env bash",
             "set -e",
             *(["set -x"] if provider.debug else []),
             *provider.pre_commands,
             shlex.join(plan[name]["command"]),
             *provider.post_commands,
         ])
+        batch = directory / f"{job_name}.batch"
+        batch.write_text(body + "\n", encoding="utf-8")
         jobs[name] = queue.submit(  # type: ignore[no-untyped-call]
-            shlex.join(["bash", "-c", body]),
+            str(batch),
             name=job_name,
             output_fpath="",
             depends=[jobs[dep] for dep in plan[name]["depends"]],
@@ -152,16 +155,38 @@ def submit_plan(  # noqa: PLR0914
         "set -e",
         f"cd {shlex.quote(str(directory))}",
         "sbatch() {",
-        "  local result arg name",
-        '  for arg in "$@"; do',
-        '    case "$arg" in --job-name=*) name="${arg#--job-name=}" ;; esac',
+        "  local result name batch",
+        "  local -a args=()",
+        "  while (( $# )); do",
+        '    case "$1" in',
+        '      --job-name=*) name="${1#--job-name=}"; args+=("$1") ;;',
+        '      --wrap) shift; batch="$1" ;;',
+        '      --wrap=*) batch="${1#--wrap=}" ;;',
+        '      *) args+=("$1") ;;',
+        "    esac",
+        "    shift",
         "  done",
-        f'  result=$(command sbatch {shlex.join(options)} "$@") || return $? ',
+        # Replace cmd_queue's wrap payload with a file submitted directly to
+        # Slurm. Its Bash shebang avoids an intermediate /bin/sh environment.
+        '  [[ -n "$batch" && -f "$batch" ]] || return 1',
+        (
+            f"  result=$(command sbatch {shlex.join(options)} "
+            '"${args[@]}" "$batch") || return $?'
+        ),
         '  if [[ ! "$result" =~ ^[0-9]+$ ]]; then',
         '    printf "Invalid sbatch job ID: %s\\n" "$result" >&2',
         "    return 1",
         "  fi",
-        f'  printf "%s\\t%s\\n" "$name" "$result" >> {shlex.quote(str(journal))}',
+        (
+            '  if ! printf "%s\\t%s\\n" "$name" "$result" >> '
+            f"{shlex.quote(str(journal))}; then"
+        ),
+        (
+            '    printf "Failed to record accepted Slurm job %s (%s); '
+            'stopping submission.\\n" "$result" "$name" >&2'
+        ),
+        "    return 1",
+        "  fi",
         '  printf "%s\\n" "$result"',
         "}",
     ])
@@ -174,7 +199,7 @@ def submit_plan(  # noqa: PLR0914
         )
     result = subprocess.run(["bash", str(script)], check=False)  # noqa: S603, S607
     handles = {}
-    if journal.exists():
+    if journal.is_file():
         for line in journal.read_text(encoding="utf-8").splitlines():
             job_name, job_id = line.split("\t")
             if job_name not in names or re.fullmatch(r"[0-9]+", job_id) is None:
