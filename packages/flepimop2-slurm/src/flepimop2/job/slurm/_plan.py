@@ -85,7 +85,7 @@ def _submission_options(provider: SlurmJob) -> list[str]:
         "mem": str(provider.memory),
         "nodes": str(provider.nodes),
         "ntasks": str(provider.ntasks),
-        "time": str(provider.time),
+        "time": provider.model_dump(mode="json", include={"time"})["time"],
         "chdir": str(provider.chdir.absolute()),
     }
     return [f"--{key}={value}" for key, value in sorted(options.items())]

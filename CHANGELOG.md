@@ -20,6 +20,9 @@
 
 ### Fixed
 
+- Serialize time limits in Slurm's `days-HH:MM:SS` format for both single-job
+  and process-plan submission, including limits of 24 hours or more.
+
 - Keep default plan-job logs in the configured working directory rather than
   submission-local temporary storage. Submit Bash batch files directly to retain
   exported module functions, and stop with an accepted-job diagnostic if writing

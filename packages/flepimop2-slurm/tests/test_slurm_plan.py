@@ -360,3 +360,23 @@ def test_batch_preserves_exported_module_function(
         env=os.environ | {"MODULE_MARKER": str(marker)},
     )
     assert marker.read_text(encoding="utf-8").strip() == "load example"
+
+
+@pytest.mark.parametrize(
+    ("limit", "expected"),
+    [
+        ("0", "0-00:00:00"),
+        ("23:59:59", "0-23:59:59"),
+        ("24:00:00", "1-00:00:00"),
+        ("1-02:03:04", "1-02:03:04"),
+        ("3-00:00:00", "3-00:00:00"),
+    ],
+)
+def test_submission_serializes_time(
+    provider: SlurmJob, plan: ProcessPlan, fake_slurm: Path, limit: str, expected: str
+) -> None:
+    """Submission uses Slurm duration syntax, including the one-day boundary."""
+    provider = SlurmJob.model_validate(provider.model_dump() | {"time": limit})
+    provider.submit_plan(plan)
+    calls = json.loads(fake_slurm.read_text(encoding="utf-8"))
+    assert all(f"--time={expected}" in call for call in calls)

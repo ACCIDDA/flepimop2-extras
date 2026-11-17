@@ -480,7 +480,7 @@ class SlurmJob(JobABC, module="slurm"):
              'nodes': '2',
              'ntasks': '4',
              'qos': 'normal',
-             'time': '1:00:00'}
+             'time': '0-01:00:00'}
         """
         opts = (
             {
@@ -494,7 +494,7 @@ class SlurmJob(JobABC, module="slurm"):
                 "mem": str(self.memory),
                 "nodes": str(self.nodes),
                 "ntasks": str(self.ntasks),
-                "time": str(self.time),
+                "time": self.model_dump(mode="json", include={"time"})["time"],
             }
         )
         return dict(sorted(opts.items()))
