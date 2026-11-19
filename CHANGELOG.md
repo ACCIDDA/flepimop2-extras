@@ -5,10 +5,10 @@
 ### Added
 
 - Support core PR #374's dependency-aware process plans in the Slurm provider,
-  using `cmd_queue` to submit one job per step with `afterok` dependencies.
+  using native `sbatch` calls to submit one job per step with `afterok` dependencies.
   Advertise `supports_plan`, inherit core's public submission validation, and
   return per-step handles for core caching. Include dry runs and partial-failure
-  journals. Development is pinned to core commit `38013b0`; this feature requires
+  journals. Development is pinned to merged core PR #379 (`0e32c71`); this feature requires
   the unreleased core API and is not compatible with flepimop2 0.3.0.
 
 ### Documentation
@@ -19,6 +19,22 @@
   metapackage from its development workspace.
 
 ### Fixed
+
+- Pin the compatible core Git revision in package metadata as well as the uv
+  workspace, preventing source installs from selecting incompatible core 0.3.0.
+  Replace this development dependency with a release before publishing to PyPI.
+
+- Bound step-derived batch filenames, reject inherited cluster constraints, and
+  permit explicitly disabled `SBATCH_WAIT=0` during plan submission.
+
+- Reject conflicting Slurm environment settings and unsupported cluster targeting
+  before plan submission. Preserve the caller's submission directory, propagate
+  pipeline failures, and include Slurm diagnostics in partial-submission errors.
+
+- Use core's step-submission template and symbolic dry-run dependencies, with
+  whole-plan preflight validation and journal-backed partial-failure recovery.
+  Parallel Slurm execution is now explicitly selected with `execution: parallel`;
+  serial execution remains one workflow job. Remove the cmd-queue dependency.
 
 - Serialize time limits in Slurm's `days-HH:MM:SS` format for both single-job
   and process-plan submission, including limits of 24 hours or more.

@@ -13,7 +13,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
-"""Exercise real cmd_queue scripts with a local fake sbatch executable."""
+"""Exercise native Slurm submissions with a local fake sbatch executable."""
 
 import json
 import os
@@ -73,11 +73,15 @@ def fake_slurm(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         "rows = json.loads(log.read_text(encoding='utf-8')) if log.exists() else []\n"
         "rows.append(sys.argv[1:])\n"
         "log.write_text(json.dumps(rows))\n"
-        "if len(rows) == int(os.environ.get('SBATCH_FAIL_AT', '0')): sys.exit(1)\n"
+        "if len(rows) == int(os.environ.get('SBATCH_FAIL_AT', '0')):\n"
+        "    print('sbatch: error: Invalid account', file=sys.stderr); sys.exit(1)\n"
+        "if os.environ.get('SBATCH_CWD_LOG'):\n"
+        "    pathlib.Path(os.environ['SBATCH_CWD_LOG']).write_text(os.getcwd())\n"
         "if os.environ.get('SBATCH_BAD_ID'): print('invalid'); sys.exit(0)\n"
         "if os.environ.get('SBATCH_BREAK_JOURNAL'):\n"
-        "    pathlib.Path('submitted.tsv').mkdir()\n"
-        "print(100 + len(rows))\n",
+        "    (pathlib.Path(sys.argv[-1]).parent / 'submitted.jsonl').mkdir()\n"
+        "print(str(100 + len(rows)) if '--parsable' in sys.argv else "
+        "'Submitted batch job ' + str(100 + len(rows)))\n",
         encoding="utf-8",
     )
     executable.chmod(0o755)
@@ -123,9 +127,9 @@ def test_plan_dry_run(provider: SlurmJob, plan: ProcessPlan, fake_slurm: Path) -
     """Dry runs render all jobs and edges without invoking sbatch."""
     result = provider.submit_plan(plan, dry_run=True)
     assert isinstance(result, JobDryRun)
-    script = Path(result.details["script"]).read_text(encoding="utf-8")
+    script = result.command
     assert script.count("--parsable") == len(plan)
-    assert "--dependency=afterok:${JOB_000}:${JOB_001}" in script
+    assert "--dependency=afterok:dry-run-A:dry-run-B" in script
     assert not fake_slurm.exists()
 
 
@@ -215,7 +219,17 @@ def test_artifact_paths_are_quoted(
 
 
 @pytest.mark.parametrize(
-    "option", ["dependency", "array", "wrap", "quiet", "wait", "parsable"]
+    "option",
+    [
+        "dependency",
+        "array",
+        "wrap",
+        "quiet",
+        "wait",
+        "parsable",
+        "clusters",
+        "cluster-constraint",
+    ],
 )
 def test_conflicting_options(
     provider: SlurmJob,
@@ -254,6 +268,7 @@ def test_core_cli_dispatches_slurm_plan(
     dry_run: bool,
 ) -> None:
     """Core builds no-deps commands and caches each Slurm handle after dispatch."""
+    provider.execution = "parallel"
     config = tmp_path / "config.json"
     config.write_text(
         json.dumps({
@@ -277,7 +292,7 @@ def test_core_cli_dispatches_slurm_plan(
     if dry_run:
         assert not fake_slurm.exists()
         save_job.assert_not_called()
-        scripts = list(tmp_path.glob("flepimop-plan-*/submit.sh"))
+        scripts = list(tmp_path.glob("flepimop-plan-*/dry-run.txt"))
         assert len(scripts) == 1
         assert "--dependency=afterok:" in scripts[0].read_text(encoding="utf-8")
         return
@@ -324,17 +339,14 @@ def test_journal_failure_stops_submission(
     plan: ProcessPlan,
     fake_slurm: Path,
     monkeypatch: pytest.MonkeyPatch,
-    capfd: pytest.CaptureFixture[str],
 ) -> None:
     """A failed append reports the accepted ID and prevents subsequent jobs."""
     monkeypatch.setenv("SBATCH_BREAK_JOURNAL", "1")
-    with pytest.raises(PlanSubmissionError):
+    with pytest.raises(PlanSubmissionError) as exc:
         provider.submit_plan(plan)
     assert len(json.loads(fake_slurm.read_text(encoding="utf-8"))) == 1
-    assert (
-        "Failed to record accepted Slurm job 101 (step-0000-A)"
-        in capfd.readouterr().err
-    )
+    assert exc.value.handles["A"].job_id == "101"
+    assert isinstance(exc.value.__cause__, OSError)
 
 
 def test_batch_preserves_exported_module_function(
@@ -380,3 +392,229 @@ def test_submission_serializes_time(
     provider.submit_plan(plan)
     calls = json.loads(fake_slurm.read_text(encoding="utf-8"))
     assert all(f"--time={expected}" in call for call in calls)
+
+
+def test_failed_fourth_submission_retains_journal(
+    provider: SlurmJob,
+    fake_slurm: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A late failure preserves all accepted IDs and allows a fresh later plan."""
+    plan: ProcessPlan = {
+        str(i): {"command": ["true"], "depends": [str(i - 1)] if i else []}
+        for i in range(5)
+    }
+    monkeypatch.setenv("SBATCH_FAIL_AT", "4")
+    with pytest.raises(PlanSubmissionError) as exc:
+        provider.submit_plan(plan)
+    assert [h.job_id for h in exc.value.handles.values()] == ["101", "102", "103"]
+    rows = (
+        (exc.value.directory / "submitted.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    )
+    assert [json.loads(row)["handle"]["job_id"] for row in rows] == [
+        "101",
+        "102",
+        "103",
+    ]
+    assert len(json.loads(fake_slurm.read_text(encoding="utf-8"))) == len(plan) - 1
+    monkeypatch.delenv("SBATCH_FAIL_AT")
+    result = provider.submit_plan({"retry": {"command": ["true"], "depends": []}})
+    assert isinstance(result, dict)
+    assert list(result) == ["retry"]
+
+
+def test_late_invalid_plan_submits_nothing(
+    provider: SlurmJob, fake_slurm: Path
+) -> None:
+    """Whole-plan validation rejects a bad final step before submitting the first."""
+    with pytest.raises(ValueError, match="unknown dependencies"):
+        provider.submit_plan({
+            "first": {"command": ["true"], "depends": []},
+            "last": {"command": ["true"], "depends": ["missing"]},
+        })
+    assert not fake_slurm.exists()
+
+
+def test_pre_command_failure_stops_batch(provider: SlurmJob, fake_slurm: Path) -> None:
+    """Pre-command failure prevents both the process and post-commands from running."""
+    provider.pre_commands = ["false"]
+    provider.post_commands = ["echo post"]
+    provider.submit_plan({"step": {"command": ["echo", "process"], "depends": []}})
+    call = json.loads(fake_slurm.read_text(encoding="utf-8"))[0]
+    result = subprocess.run(  # noqa: S603
+        ["bash", call[-1]],  # noqa: S607
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert not result.stdout
+
+
+def test_core_cli_serial_uses_one_job(
+    provider: SlurmJob,
+    tmp_path: Path,
+    fake_slurm: Path,
+) -> None:
+    """Default serial dispatch submits the workflow once without no-deps."""
+    config = tmp_path / "serial.json"
+    config.write_text(
+        json.dumps({
+            "jobs": {"cluster": provider.model_dump(mode="json")},
+            "process": {
+                "a": {"module": "shell"},
+                "b": {"module": "shell", "depends": ["a"]},
+            },
+        })
+    )
+    with patch("flepimop2.cli._job_command._cache.save_job") as save_job:
+        result = CliRunner().invoke(
+            job_group,
+            [
+                "process",
+                str(config),
+                "--target",
+                "b",
+                "--job-target",
+                "cluster",
+            ],
+        )
+    assert result.exit_code == 0, (result.output, result.exception)
+    calls = json.loads(fake_slurm.read_text(encoding="utf-8"))
+    assert len(calls) == 1
+    assert "--no-deps" not in Path(calls[0][-1]).read_text(encoding="utf-8")
+    save_job.assert_called_once()
+
+
+def test_unusual_step_names(provider: SlurmJob, fake_slurm: Path) -> None:
+    """Original names survive handles while filenames remain distinct and safe."""
+    names = ["a b", "a$b", "../$(false)"]
+    result = provider.submit_plan({
+        name: {"command": ["true"], "depends": []} for name in names
+    })
+    assert isinstance(result, dict)
+    assert list(result) == names
+    calls = json.loads(fake_slurm.read_text(encoding="utf-8"))
+    assert len({call[-1] for call in calls}) == len(names)
+    assert all(
+        Path(call[-1]).parent.name.startswith("flepimop-plan-") for call in calls
+    )
+
+
+@pytest.mark.parametrize(
+    "variable",
+    [
+        "SBATCH_ARRAY_INX",
+        "SBATCH_WAIT",
+        "SBATCH_CLUSTER_CONSTRAINT",
+        "SBATCH_CLUSTERS",
+        "SLURM_CLUSTERS",
+    ],
+)
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_conflicting_environment_is_rejected(  # noqa: PLR0913
+    provider: SlurmJob,
+    plan: ProcessPlan,
+    fake_slurm: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    variable: str,
+    *,
+    dry_run: bool,
+) -> None:
+    """Environment overrides are rejected before submission, including previews."""
+    monkeypatch.setenv(variable, "1")
+    with pytest.raises(ValueError, match=variable):
+        provider.submit_plan(plan, dry_run=dry_run)
+    assert not fake_slurm.exists()
+
+
+def test_submission_preserves_caller_directory(
+    provider: SlurmJob,
+    plan: ProcessPlan,
+    fake_slurm: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The submit directory stays distinct from artifact and compute directories."""
+    launch = tmp_path / "launch"
+    launch.mkdir()
+    cwd_log = tmp_path / "submit-cwd.txt"
+    monkeypatch.chdir(launch)
+    monkeypatch.setenv("SBATCH_CWD_LOG", str(cwd_log))
+    provider.submit_plan(plan)
+    assert Path(cwd_log.read_text(encoding="utf-8")) == launch
+    calls = json.loads(fake_slurm.read_text(encoding="utf-8"))
+    assert all(f"--chdir={provider.chdir}" in call for call in calls)
+    assert all(Path(call[-1]).is_absolute() for call in calls)
+
+
+@pytest.mark.parametrize("phase", ["pre", "post"])
+def test_pipeline_failure_propagates(
+    provider: SlurmJob,
+    fake_slurm: Path,
+    phase: str,
+) -> None:
+    """A failed pipeline component makes the batch fail, including post-commands."""
+    if phase == "pre":
+        provider.pre_commands = ["false | cat"]
+    else:
+        provider.post_commands = ["false | cat"]
+    provider.submit_plan({"step": {"command": ["echo", "process"], "depends": []}})
+    call = json.loads(fake_slurm.read_text(encoding="utf-8"))[0]
+    result = subprocess.run(  # noqa: S603
+        ["bash", call[-1]],  # noqa: S607
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    if phase == "pre":
+        assert not result.stdout
+
+
+def test_submission_error_includes_slurm_diagnostic(
+    provider: SlurmJob,
+    plan: ProcessPlan,
+    fake_slurm: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The visible exception identifies the failed step and retains earlier IDs."""
+    monkeypatch.setenv("SBATCH_FAIL_AT", "2")
+    with pytest.raises(PlanSubmissionError, match="Invalid account") as exc:
+        provider.submit_plan(plan)
+    assert "step 'B'" in str(exc.value)
+    assert exc.value.handles["A"].job_id == "101"
+    assert len(json.loads(fake_slurm.read_text(encoding="utf-8"))) == len(plan) - 1
+
+
+def test_long_step_names_remain_distinct(provider: SlurmJob, fake_slurm: Path) -> None:
+    """Long names sharing a prefix retain unique bounded batch filenames."""
+    prefix = "x" * 300
+    names = [prefix + "a", prefix + "b"]
+    result = provider.submit_plan({
+        names[0]: {"command": ["true"], "depends": []},
+        names[1]: {"command": ["true"], "depends": [names[0]]},
+    })
+    assert isinstance(result, dict)
+    assert list(result) == names
+    calls = json.loads(fake_slurm.read_text(encoding="utf-8"))
+    assert calls[0][-1] != calls[1][-1]
+    assert all(Path(call[-1]).is_file() for call in calls)
+    assert "--dependency=afterok:101" in calls[1]
+    assert [handle.metadata["step"] for handle in result.values()] == names
+
+
+def test_disabled_wait_environment_is_allowed(
+    provider: SlurmJob,
+    plan: ProcessPlan,
+    fake_slurm: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An explicitly disabled Slurm wait option does not block plan submission."""
+    monkeypatch.setenv("SBATCH_WAIT", "0")
+    result = provider.submit_plan(plan)
+    assert isinstance(result, dict)
+    assert result.keys() == plan.keys()
+    assert len(json.loads(fake_slurm.read_text(encoding="utf-8"))) == len(plan)

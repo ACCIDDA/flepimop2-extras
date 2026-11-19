@@ -102,51 +102,71 @@ job:
 
 ## Dependency-aware process plans
 
-The provider advertises `supports_plan = True` and implements `_submit_plan`
-for core's inherited `JobABC.submit_plan` entrypoint. It imports `ProcessPlan`
-from `flepimop2.process._plan`; core constructs the plan, validates the module,
-and caches the returned per-step handles.
+The provider advertises `supports_plan = True` and
+`supports_detached_plan = True`. Core's inherited `submit_plan()` validates the
+backend, and its default plan loop resolves prerequisite handles and calls our
+`_submit_step()`. A small Slurm `_submit_plan()` wrapper validates and orders the
+whole plan before submission and retains accepted handles on failure.
 
-This integration currently requires core PR #374 at commit
-`38013b063e57cafecefa101909785c617f911d3b`. The workspace's `tool.uv.sources`
-pins that revision for development and CI (`uv sync` / `uv run pytest`).
-Released flepimop2 0.3.0 lacks this API. Before publishing, replace the temporary
-source pin and update the shared core version constraint to a release containing
-that PR; uv source overrides are not included in published dependencies.
+The workspace and package dependencies pin merged core PR #379 at commit
+`0e32c714521a8f329e78c6f6b56e7200f26501dc` for source installation, development, and CI.
+Before publishing to PyPI, replace the shared Git dependency with a released
+core version containing that API and remove the temporary source override.
+Core 0.3.0 is not compatible. The explicit package dependency also protects
+installations outside the uv workspace from selecting that older core.
 
-Each command is a complete argument vector and must execute only its own
-process. The provider does not expand process prerequisites or add a
-`flepimop2` executable prefix. Core remains responsible for target selection,
-skip/force semantics, and constructing those individual commands.
+Configure `execution: parallel` on the Slurm job provider to submit one job per
+process step. The default, `execution: serial`, submits one batch job running
+the whole workflow in order. Parallel submission invokes `sbatch --parsable`
+directly, with `--dependency=afterok:<ids>` for prerequisites. Independent steps
+can run concurrently, and Slurm manages execution after the CLI exits.
 
-`cmd_queue` renders one Slurm submission per step, with `afterok` dependencies
-on the prerequisite job IDs. Independent steps can run concurrently. Submission
-returns a dictionary mapping the original step names to `JobHandle` objects;
-it does not wait for the compute jobs to finish. Existing single-command
-submission continues to use `_submit`.
+Each command is a complete argument vector that runs only its own process.
+Core owns target selection, skip/force semantics, and command construction.
+Submission returns per-step handles for core logging and caching without
+waiting for compute jobs to finish.
 
 The configured resources, working directory, and pre/post commands apply to
-every step. Step scripts stop on failure, so post-commands run only after a
+every step. Step scripts use `set -e -o pipefail`, so post-commands run only after a
 successful process. Each step is submitted as a Bash-shebang batch file, so an
 intermediate `/bin/sh` cannot strip exported Bash functions such as `module`.
 Dependencies control execution order; processes must write
 their outputs to storage accessible by downstream jobs.
 
-A dry run returns `JobDryRun` with the generated submission script path and
-step count, without invoking `sbatch`. Submission scripts, per-step batch files,
-and a submission journal are retained in a unique subdirectory of
-`sbatch-directory` (or a temporary directory). Slurm reads the batch files at
-submission; compute nodes do not need access to that directory. Default job
-stdout/stderr goes to `slurm-%x-%j.out` in the configured working directory,
-which must be compute-visible. Explicit `sbatch-options.output` and `error`
-settings are preserved; their parent directories must also be compute-visible.
-If submission fails midway, `PlanSubmissionError.handles` contains
-the jobs already accepted by Slurm; those jobs are not automatically cancelled.
-If recording an accepted job fails, submission stops immediately and stderr
-reports its job ID and name for recovery. That ID may be absent from the journal
-and exception handles, so retain the submission error output.
+A dry run returns display-only `sbatch` commands with symbolic dependencies
+such as `--dependency=afterok:dry-run-prepare`. These placeholders are not real
+Slurm IDs; the preview must not be executed as a submission script. Batch files
+and `dry-run.txt` are retained under the directory reported in `JobDryRun.details`.
+Real submissions retain a `submitted.jsonl` journal of accepted handles.
+Artifacts use a unique subdirectory of `sbatch-directory` (or a temporary
+directory). Slurm reads batch files at submission; compute nodes do not need
+access to that directory. Default output goes to `slurm-%x-%j.out` in the
+configured working directory. Explicit `output` and `error` settings are
+preserved; output directories must be compute-visible.
+
+On failure, `PlanSubmissionError.handles` includes all known accepted jobs,
+including a job whose journal write failed. Its `directory` identifies retained
+artifacts; the chained exception explains the failure. Accepted jobs are not
+automatically cancelled or retried, and partial handles are not automatically
+cached by core. A crash between scheduler acceptance and receiving/recording
+an ID still requires manual reconciliation.
+
+Failed prerequisites prevent dependent jobs from running. Slurm's cluster
+policy controls whether those jobs remain pending or are cancelled; set
+`sbatch-options: {kill-on-invalid-dep: "yes"}` to request cancellation explicitly.
 
 Plan submissions reserve `dependency`, `array`, `wrap`, `parsable`, `quiet`,
-and `wait` in `sbatch-options` because these conflict with one tracked job per
+`wait`, `clusters`, and `cluster-constraint` in `sbatch-options` because these
+conflict with one tracked local-cluster job per
 step and dependency-aware submission. This implementation expects numeric
 Slurm job IDs and does not support federated `jobid;cluster` responses.
+Unset `SBATCH_ARRAY_INX`, `SBATCH_CLUSTER_CONSTRAINT`, `SBATCH_CLUSTERS`,
+`SLURM_CLUSTERS`, and enabled `SBATCH_WAIT`
+before submitting a plan (including dry runs); their presence is rejected rather
+than silently changing the plan. `SBATCH_WAIT=0` is permitted. Other environment
+settings are inherited. Batch filenames use bounded labels and unique step
+indices; original process names are retained in handle metadata.
+Submission preserves the caller's directory and hence `SLURM_SUBMIT_DIR`;
+`chdir` independently selects the batch job's working directory.
+Slurm submission failures include the failing step, exit code, and diagnostic
+output in the exception, alongside any already accepted handles.
