@@ -269,7 +269,13 @@ class ArvizBackend(BackendABC, module="arviz"):
         encoding = {var: {"zlib": True, "complevel": 4} for var in ds.data_vars}
         ds.to_netcdf(shard_path, group=self.group, mode="w", encoding=encoding)
 
-    def _read(self, run_meta: RunMeta) -> Float64NDArray:
+    def _read(
+        self,
+        run_meta: RunMeta,
+        *,
+        model_state: ModelStateSpecification | None = None,
+        axes: AxisCollection | None = None,
+    ) -> Float64NDArray:
         """
         Read one draw back as the `(T, 1 + n_state)` engine array.
 
@@ -283,6 +289,12 @@ class ArvizBackend(BackendABC, module="arviz"):
             run_meta: Metadata about the current run; its `name` overrides
                 `self.name` for both the shard directory and the combined
                 file path when provided.
+            model_state: Optional specification; when provided, only the
+                data variables it names (by parameter name or label) are
+                returned.
+            axes: Optional runtime axes; when provided, categorical axes
+                with labels restrict the matching dimension to those
+                coordinate labels.
 
         Returns:
             `(T, 1 + n_state)` float64 array: column 0 is the `time`
@@ -301,14 +313,16 @@ class ArvizBackend(BackendABC, module="arviz"):
         shard_path = shard_dir / f"draw_{chain_idx:04d}_{draw_idx:04d}.nc"
         if shard_path.exists():
             with xr.open_dataset(shard_path, group=self.group) as ds:
-                return self._dataset_to_engine_array(ds.isel(chain=0, draw=0))
+                one = self._apply_filters(ds.isel(chain=0, draw=0), model_state, axes)
+                return self._dataset_to_engine_array(one)
 
         combined_path = self._combined_path(run_meta)
         if combined_path.exists():
             with xr.open_dataset(combined_path, group=self.group) as ds:
-                return self._dataset_to_engine_array(
-                    ds.isel(chain=chain_idx, draw=draw_idx)
+                one = self._apply_filters(
+                    ds.isel(chain=chain_idx, draw=draw_idx), model_state, axes
                 )
+                return self._dataset_to_engine_array(one)
 
         msg = (
             f"No data for chain={chain_idx}, draw={draw_idx}: neither the "
@@ -318,6 +332,36 @@ class ArvizBackend(BackendABC, module="arviz"):
             "the combined file."
         )
         raise FileNotFoundError(msg)
+
+    @staticmethod
+    def _apply_filters(
+        ds: xr.Dataset,
+        model_state: ModelStateSpecification | None,
+        axes: AxisCollection | None,
+    ) -> xr.Dataset:
+        """
+        Restrict a per-draw dataset to the requested states and axis labels.
+
+        Args:
+            ds: Per-draw dataset with dims `(time, *axes)`.
+            model_state: Optional state filter (parameter names or labels).
+            axes: Optional axis filter; only categorical axes with labels
+                that are also dimensions of `ds` are applied.
+
+        Returns:
+            The filtered dataset (`ds` itself when no filter applies).
+        """
+        if model_state is not None:
+            allowed = {*model_state.parameter_names, *(model_state.labels or ())}
+            ds = ds[[name for name in ds.data_vars if name in allowed]]
+        if axes is not None:
+            for axis_name, axis in axes.items():
+                if axis.labels is None or axis_name not in ds.dims:
+                    continue
+                present = set(ds[axis_name].values.tolist())
+                keep = [lbl for lbl in axis.labels if lbl in present]
+                ds = ds.sel({axis_name: keep})
+        return ds
 
     @staticmethod
     def _dataset_to_engine_array(ds: xr.Dataset) -> Float64NDArray:

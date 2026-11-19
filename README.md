@@ -54,10 +54,12 @@ Below is an index of the current packages included in `flepimop2-extras`.
 - `flepimop2-extras` Extras: The extra groups that the module is included in.
 - Documentation: Link to the documentation for the module.
 
-| Module Name   | Module Type | Package                 | `flepimop2-extras` Extras | Documentation                                    |
-| ------------- | ----------- | ----------------------- | ------------------------- | ------------------------------------------------ |
-| `ipynbrender` | `process`   | `flepimop2-ipynbrender` | `all`, `ipynbrender`      | [Link](packages/flepimop2-ipynbrender/README.md) |
-| `slurm`       | `job`       | `flepimop2-slurm`       | `all`, `slurm`            | [Link](packages/flepimop2-slurm/README.md)       |
+| Module Name     | Module Type | Package                 | `flepimop2-extras` Extras | Documentation                                    |
+| --------------- | ----------- | ----------------------- | ------------------------- | ------------------------------------------------ |
+| `arviz`         | `backend`   | `flepimop2-arviz`       | `all`, `arviz`            | [Link](packages/flepimop2-arviz/README.md)       |
+| `arviz_combine` | `process`   | `flepimop2-arviz`       | `all`, `arviz`            | [Link](packages/flepimop2-arviz/README.md)       |
+| `ipynbrender`   | `process`   | `flepimop2-ipynbrender` | `all`, `ipynbrender`      | [Link](packages/flepimop2-ipynbrender/README.md) |
+| `slurm`         | `job`       | `flepimop2-slurm`       | `all`, `slurm`            | [Link](packages/flepimop2-slurm/README.md)       |
 
 ## Contributing
 

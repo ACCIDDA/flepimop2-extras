@@ -325,3 +325,29 @@ def test_git_commit_is_cached_across_calls() -> None:
     assert second == "deadbeef"
     assert third == "deadbeef"
     assert mock_run.call_count == 1
+
+
+def test_read_filters_by_model_state_and_axes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """read() restricts states via model_state and axis labels via axes."""
+    monkeypatch.setenv("FLEPIMOP2_CHAIN", "0")
+    monkeypatch.setenv("FLEPIMOP2_DRAW", "0")
+    model_state = ModelStateSpecification(parameter_names=("s0", "i0"), axes=("age",))
+    axes = AxisCollection.from_config({
+        "age": {"kind": "categorical", "labels": ["child", "adult"]},
+    })
+    backend = ArvizBackend(root=tmp_path)
+    # time + (s0: child, adult) + (i0: child, adult)
+    data = np.array([[0.0, 1.0, 2.0, 3.0, 4.0], [1.0, 5.0, 6.0, 7.0, 8.0]])
+    backend.save(data, RunMeta(), model_state=model_state, axes=axes)
+
+    only_i0 = np.asarray(
+        backend.read(RunMeta(), model_state=ModelStateSpecification.filter("i0"))
+    )
+    np.testing.assert_allclose(only_i0, data[:, [0, 3, 4]])
+
+    adults = np.asarray(
+        backend.read(RunMeta(), axes=AxisCollection.filter(age="adult"))
+    )
+    np.testing.assert_allclose(adults, data[:, [0, 2, 4]])
