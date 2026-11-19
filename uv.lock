@@ -2,8 +2,18 @@ version = 1
 revision = 3
 requires-python = ">=3.11, <3.15"
 resolution-markers = [
-    "python_full_version >= '3.14'",
-    "python_full_version < '3.14'",
+    "python_full_version >= '3.14' and sys_platform == 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
+    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version == '3.13.*' and sys_platform == 'win32'",
+    "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
+    "python_full_version == '3.13.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version == '3.12.*' and sys_platform == 'win32'",
+    "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
+    "python_full_version == '3.12.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'emscripten'",
+    "python_full_version < '3.12' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 
 [manifest]
@@ -85,6 +95,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/74/cd/15777dfde1c29d96de7f18edf4cc94c385646852e7c7b0320aa91ccca583/argon2_cffi_bindings-25.1.0-cp39-abi3-win32.whl", hash = "sha256:473bcb5f82924b1becbb637b63303ec8d10e84c8d241119419897a26116515d2", size = 27180, upload-time = "2025-07-30T10:01:57.759Z" },
     { url = "https://files.pythonhosted.org/packages/e2/c6/a759ece8f1829d1f162261226fbfd2c6832b3ff7657384045286d2afa384/argon2_cffi_bindings-25.1.0-cp39-abi3-win_amd64.whl", hash = "sha256:a98cd7d17e9f7ce244c0803cad3c23a7d379c301ba618a5fa76a67d116618b98", size = 31715, upload-time = "2025-07-30T10:01:58.56Z" },
     { url = "https://files.pythonhosted.org/packages/42/b9/f8d6fa329ab25128b7e98fd83a3cb34d9db5b059a9847eddb840a0af45dd/argon2_cffi_bindings-25.1.0-cp39-abi3-win_arm64.whl", hash = "sha256:b0fdbcf513833809c882823f98dc2f931cf659d9a1429616ac3adebb49f5db94", size = 27149, upload-time = "2025-07-30T10:01:59.329Z" },
+]
+
+[[package]]
+name = "array-api-compat"
+version = "1.16.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/da/88/d7b0f89b1ad0f42ef94b8440fff87b7c0b69701b3c30a5b160fdbc850f25/array_api_compat-1.16.0.tar.gz", hash = "sha256:c8117cb4d6c7aacaec38c2705f72509e342c20b1a716a04cb5397a611f122d51", size = 134991, upload-time = "2026-10-25T18:37:17.582Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d0/09/cab56a48b7e83609831c96f36658f9e30421877875071f2413eb591cf756/array_api_compat-1.16.0-py3-none-any.whl", hash = "sha256:0464934d7d5f1e9b728b2e248da52400630b1fcb46b70073eab3c7ae084290aa", size = 81744, upload-time = "2026-10-25T18:37:15.934Z" },
 ]
 
 [[package]]
@@ -645,18 +664,15 @@ wheels = [
 
 [[package]]
 name = "flepimop2"
-version = "0.3.0"
-source = { registry = "https://pypi.org/simple" }
+version = "0.4.0.dev0"
+source = { git = "https://github.com/ACCIDDA/flepimop2.git?rev=0e32c714521a8f329e78c6f6b56e7200f26501dc#0e32c714521a8f329e78c6f6b56e7200f26501dc" }
 dependencies = [
+    { name = "array-api-compat" },
     { name = "click" },
     { name = "numpy" },
     { name = "pydantic" },
     { name = "pyyaml" },
     { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/4f/34/8655d5ff42e5c6c4f149f9754da7893db452b158e400ad39f6452599ff20/flepimop2-0.3.0.tar.gz", hash = "sha256:b92d14e4e740db23abbce555cebf69906cfd9cfe932c6edcb36bd9425d69ebf5", size = 101133, upload-time = "2026-06-11T20:36:59.952Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/33/97/4deb4aaa7faa82c4b243414195598f0ffaa01707d89e2b396789c3be5552/flepimop2-0.3.0-py3-none-any.whl", hash = "sha256:542396003e534ea87c1704f61102cf4ccd3bf82de404f008e69ae193b59e6b99", size = 142464, upload-time = "2026-06-11T20:36:58.618Z" },
 ]
 
 [[package]]
@@ -724,7 +740,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "flepimop2", specifier = ">=0.3.0,<1.0.0" },
+    { name = "flepimop2", git = "https://github.com/ACCIDDA/flepimop2.git?rev=0e32c714521a8f329e78c6f6b56e7200f26501dc" },
     { name = "jupyter", specifier = ">=1.1.1" },
     { name = "nbformat", specifier = ">=5.10.4" },
     { name = "pydantic", specifier = ">=2.12.4" },
@@ -739,7 +755,7 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "flepimop2", specifier = ">=0.3.0,<1.0.0" }]
+requires-dist = [{ name = "flepimop2", git = "https://github.com/ACCIDDA/flepimop2.git?rev=0e32c714521a8f329e78c6f6b56e7200f26501dc" }]
 
 [[package]]
 name = "fqdn"

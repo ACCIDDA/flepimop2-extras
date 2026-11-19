@@ -27,7 +27,7 @@ import subprocess  # noqa: S404
 from pathlib import Path
 from shutil import which
 from tempfile import mkdtemp
-from typing import Final
+from typing import ClassVar, Final
 from zlib import adler32
 
 from flepimop2.cli import CliCommand
@@ -41,8 +41,15 @@ from flepimop2.job.abc import (
 )
 from flepimop2.job.slurm._command_list import CommandList
 from flepimop2.job.slurm._memory_str import MemoryStr
+from flepimop2.job.slurm._plan import (  # noqa: PLC2701
+    PlanSubmission,
+    PlanSubmissionError,
+    _plan_order,
+    _submission_options,
+)
 from flepimop2.job.slurm._slurm_timedelta import SlurmTimedelta
-from pydantic import ConfigDict, Field, model_validator
+from flepimop2.process.abc import ProcessPlan
+from pydantic import ConfigDict, Field, PrivateAttr, model_validator
 
 _SBATCH_OPTIONS_RESERVED_KEYS: Final[frozenset[str]] = frozenset({
     "chdir",
@@ -126,6 +133,10 @@ class SlurmJob(JobABC, module="slurm"):
             not specified or `None` a temporary directory will be used. It can be
             helpful for debugging or for keeping a record of the sbatch files.
     """
+
+    supports_plan: ClassVar[bool] = True
+    supports_detached_plan: ClassVar[bool] = True
+    _plan_submission: PlanSubmission | None = PrivateAttr(default=None)
 
     model_config = ConfigDict(extra="allow", populate_by_name=True)
 
@@ -476,7 +487,7 @@ class SlurmJob(JobABC, module="slurm"):
              'nodes': '2',
              'ntasks': '4',
              'qos': 'normal',
-             'time': '1:00:00'}
+             'time': '0-01:00:00'}
         """
         opts = (
             {
@@ -490,7 +501,7 @@ class SlurmJob(JobABC, module="slurm"):
                 "mem": str(self.memory),
                 "nodes": str(self.nodes),
                 "ntasks": str(self.ntasks),
-                "time": str(self.time),
+                "time": self.model_dump(mode="json", include={"time"})["time"],
             }
         )
         return dict(sorted(opts.items()))
@@ -565,6 +576,75 @@ class SlurmJob(JobABC, module="slurm"):
         )
         job_id = self._parse_sbatch_job_id(result.stdout)
         return JobHandle(job_id=job_id, backend="slurm")
+
+    def _submit_plan(
+        self, plan: ProcessPlan, *, dry_run: bool = False
+    ) -> dict[str, JobHandle] | JobDryRun:
+        """Submit one Slurm job per step, preserving prerequisite relationships.
+
+        Commands must execute only their own step; core owns plan construction
+        and process execution. The inherited submit_plan entrypoint owns backend
+        validation. Dry runs render the complete submission without calling Slurm.
+
+        Returns:
+            Per-step job handles, or the rendered submission for a dry run.
+
+        Raises:
+            RuntimeError: A plan is already active on this provider.
+            PlanSubmissionError: Submission fails; accepted handles are retained.
+        """
+        order = _plan_order(plan)
+        _submission_options(self)
+        if self._plan_submission is not None:
+            msg = "A plan submission is already active on this provider."
+            raise RuntimeError(msg)
+        context = PlanSubmission.create(self)
+        self._plan_submission = context
+        try:
+            result = super()._submit_plan(
+                {name: plan[name] for name in order}, dry_run=dry_run
+            )
+            if isinstance(result, JobDryRun):
+                result.details.update(
+                    directory=str(context.directory), steps=str(len(plan))
+                )
+                (context.directory / "dry-run.txt").write_text(
+                    result.command, encoding="utf-8"
+                )
+        except Exception as exc:
+            raise PlanSubmissionError(
+                context.handles, context.directory, str(exc)
+            ) from exc
+        finally:
+            self._plan_submission = None
+        return result
+
+    def _submit_step(
+        self,
+        step_name: str,
+        command: list[str],
+        depends_on: list[JobHandle],
+        *,
+        dry_run: bool = False,
+    ) -> JobHandle | JobDryRun:
+        """Submit a step using the active plan's recovery context.
+
+        Returns:
+            A job handle or a dry-run command with symbolic dependencies.
+
+        Raises:
+            RuntimeError: No plan submission is active.
+        """
+        if self._plan_submission is None:
+            msg = "Step submission requires an active submit_plan call."
+            raise RuntimeError(msg)
+        return self._plan_submission.submit_step(
+            self,
+            step_name,
+            command,
+            depends_on,
+            dry_run=dry_run,
+        )
 
     @staticmethod
     def _submit_validate() -> list[ValidationIssue]:

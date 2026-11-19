@@ -9,7 +9,7 @@ authors = [
 ]
 requires-python = ">=3.11,<3.15"
 dependencies = [
-    "flepimop2>=0.3.0,<1.0.0",
+    "flepimop2 @ git+https://github.com/ACCIDDA/flepimop2.git@0e32c714521a8f329e78c6f6b56e7200f26501dc",
     "jupyter>=1.1.1",
     "nbformat>=5.10.4",
     "pydantic>=2.12.4",
@@ -49,3 +49,7 @@ include = [
     "README.md",
     "pyproject.toml",
 ]
+
+# Source-only development dependency until core publishes the plan API.
+[tool.hatch.metadata]
+allow-direct-references = true

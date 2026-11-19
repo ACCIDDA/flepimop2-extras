@@ -363,3 +363,20 @@ def test_slurm_job_status_validate(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(slurm_module, "which", lambda _: "/usr/bin/seff")
     assert SlurmJob._status_validate() is None
+
+
+@pytest.mark.parametrize(
+    ("limit", "expected"),
+    [
+        ("0", "0-00:00:00"),
+        ("23:59:59", "0-23:59:59"),
+        ("24:00:00", "1-00:00:00"),
+        ("1-02:03:04", "1-02:03:04"),
+        ("3-00:00:00", "3-00:00:00"),
+    ],
+)
+def test_submission_serializes_time(limit: str, expected: str) -> None:
+    """Submission uses Slurm duration syntax, including the one-day boundary."""
+    job = SlurmJob.model_validate(_slurm_job_config(time=limit))
+    script = job._sbatch_contents(ExampleCommand(config=Path("config.yaml")))
+    assert f'#SBATCH --time="{expected}"' in script

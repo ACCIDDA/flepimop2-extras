@@ -99,3 +99,74 @@ job:
 ```
 
 - `sbatch-directory`: The directory that the sbatch submission file is written to. If not specified a temporary directory will be created. It can be helpful for debugging purposes to retain these, but these should not be kept in version control as they are generated artifacts.
+
+## Dependency-aware process plans
+
+The provider advertises `supports_plan = True` and
+`supports_detached_plan = True`. Core's inherited `submit_plan()` validates the
+backend, and its default plan loop resolves prerequisite handles and calls our
+`_submit_step()`. A small Slurm `_submit_plan()` wrapper validates and orders the
+whole plan before submission and retains accepted handles on failure.
+
+The workspace and package dependencies pin merged core PR #379 at commit
+`0e32c714521a8f329e78c6f6b56e7200f26501dc` for source installation, development, and CI.
+Before publishing to PyPI, replace the shared Git dependency with a released
+core version containing that API and remove the temporary source override.
+Core 0.3.0 is not compatible. The explicit package dependency also protects
+installations outside the uv workspace from selecting that older core.
+
+Configure `execution: parallel` on the Slurm job provider to submit one job per
+process step. The default, `execution: serial`, submits one batch job running
+the whole workflow in order. Parallel submission invokes `sbatch --parsable`
+directly, with `--dependency=afterok:<ids>` for prerequisites. Independent steps
+can run concurrently, and Slurm manages execution after the CLI exits.
+
+Each command is a complete argument vector that runs only its own process.
+Core owns target selection, skip/force semantics, and command construction.
+Submission returns per-step handles for core logging and caching without
+waiting for compute jobs to finish.
+
+The configured resources, working directory, and pre/post commands apply to
+every step. Step scripts use `set -e -o pipefail`, so post-commands run only after a
+successful process. Each step is submitted as a Bash-shebang batch file, so an
+intermediate `/bin/sh` cannot strip exported Bash functions such as `module`.
+Dependencies control execution order; processes must write
+their outputs to storage accessible by downstream jobs.
+
+A dry run returns display-only `sbatch` commands with symbolic dependencies
+such as `--dependency=afterok:dry-run-prepare`. These placeholders are not real
+Slurm IDs; the preview must not be executed as a submission script. Batch files
+and `dry-run.txt` are retained under the directory reported in `JobDryRun.details`.
+Real submissions retain a `submitted.jsonl` journal of accepted handles.
+Artifacts use a unique subdirectory of `sbatch-directory` (or a temporary
+directory). Slurm reads batch files at submission; compute nodes do not need
+access to that directory. Default output goes to `slurm-%x-%j.out` in the
+configured working directory. Explicit `output` and `error` settings are
+preserved; output directories must be compute-visible.
+
+On failure, `PlanSubmissionError.handles` includes all known accepted jobs,
+including a job whose journal write failed. Its `directory` identifies retained
+artifacts; the chained exception explains the failure. Accepted jobs are not
+automatically cancelled or retried, and partial handles are not automatically
+cached by core. A crash between scheduler acceptance and receiving/recording
+an ID still requires manual reconciliation.
+
+Failed prerequisites prevent dependent jobs from running. Slurm's cluster
+policy controls whether those jobs remain pending or are cancelled; set
+`sbatch-options: {kill-on-invalid-dep: "yes"}` to request cancellation explicitly.
+
+Plan submissions reserve `dependency`, `array`, `wrap`, `parsable`, `quiet`,
+`wait`, `clusters`, and `cluster-constraint` in `sbatch-options` because these
+conflict with one tracked local-cluster job per
+step and dependency-aware submission. This implementation expects numeric
+Slurm job IDs and does not support federated `jobid;cluster` responses.
+Unset `SBATCH_ARRAY_INX`, `SBATCH_CLUSTER_CONSTRAINT`, `SBATCH_CLUSTERS`,
+`SLURM_CLUSTERS`, and enabled `SBATCH_WAIT`
+before submitting a plan (including dry runs); their presence is rejected rather
+than silently changing the plan. `SBATCH_WAIT=0` is permitted. Other environment
+settings are inherited. Batch filenames use bounded labels and unique step
+indices; original process names are retained in handle metadata.
+Submission preserves the caller's directory and hence `SLURM_SUBMIT_DIR`;
+`chdir` independently selects the batch job's working directory.
+Slurm submission failures include the failing step, exit code, and diagnostic
+output in the exception, alongside any already accepted handles.
